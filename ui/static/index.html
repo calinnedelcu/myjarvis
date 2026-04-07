@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. Dashboard V2</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <!-- Prism.js for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="logo-container">
+            <h1 class="logo-text">[ J.A.R.V.I.S. ]</h1>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item active" data-target="page-home" title="Home">
+                <span class="icon">⊞</span> <span class="nav-text">Home</span>
+            </li>
+            <li class="nav-item" data-target="page-brain" title="Brain">
+                <span class="icon">◎</span> <span class="nav-text">Brain</span>
+            </li>
+            <li class="nav-item" data-target="page-briefing" title="Briefing">
+                <span class="icon">☼</span> <span class="nav-text">Briefing</span>
+            </li>
+            <li class="nav-item" data-target="page-projects" title="Projects">
+                <span class="icon">📁</span> <span class="nav-text">Projects</span>
+            </li>
+            <li class="nav-item" data-target="page-ide" title="Claude IDE">
+                <span class="icon">_></span> <span class="nav-text">Claude IDE</span>
+            </li>
+            <li class="nav-item" data-target="page-settings" title="Settings">
+                <span class="icon">⚙</span> <span class="nav-text">Settings</span>
+            </li>
+        </ul>
+        <button id="toggle-sidebar" class="toggle-btn" title="Toggle Sidebar">«</button>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <h2 id="page-title">HOME OVERVIEW</h2>
+            <div class="top-bar-right">
+                <div class="status-indicator" title="Jarvis Status">
+                    <span class="status-dot standby" id="jarvis-status-dot"></span>
+                    <span id="jarvis-status-label">STANDBY</span>
+                </div>
+                <div class="clock">
+                    <span id="header-date">2026-04-07</span>
+                    <span id="header-time">12:00:00</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Pages Container -->
+        <div class="pages-container">
+            
+            <!-- HOME PAGE -->
+            <section id="page-home" class="page active">
+                <!-- Background effects -->
+                <div class="hud-grid-bg"></div>
+                <div class="hud-particles" id="hud-particles"></div>
+                <div class="hud-scanline"></div>
+
+                <!-- Corner brackets -->
+                <div class="hud-corner tl"></div>
+                <div class="hud-corner tr"></div>
+                <div class="hud-corner bl"></div>
+                <div class="hud-corner br"></div>
+
+                <!-- Center Arc Reactor -->
+                <div class="arc-reactor-container">
+                    <svg class="arc-reactor" viewBox="0 0 400 400">
+                        <!-- Outer decorative ring -->
+                        <circle cx="200" cy="200" r="190" fill="none" stroke="rgba(0,200,232,0.08)" stroke-width="1"/>
+                        <!-- Tick marks on outer ring -->
+                        <g class="arc-ticks" id="arc-ticks"></g>
+                        <!-- Calendar arc (outer ring) — 24h clock -->
+                        <circle class="arc-ring arc-ring-outer" cx="200" cy="200" r="175"
+                                fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="18"/>
+                        <circle class="arc-ring-progress" id="arc-calendar" cx="200" cy="200" r="175"
+                                fill="none" stroke="rgba(0,200,232,0.25)" stroke-width="18"
+                                stroke-dasharray="1099.56" stroke-dashoffset="1099.56"
+                                stroke-linecap="round" transform="rotate(-90 200 200)"/>
+                        <!-- Time marker on calendar ring -->
+                        <circle class="time-marker" id="time-marker" cx="200" cy="25" r="4"
+                                fill="#00c8e8" filter="url(#glow)"/>
+                        <!-- CPU arc (middle ring) -->
+                        <circle cx="200" cy="200" r="145" fill="none" stroke="rgba(179,136,255,0.1)" stroke-width="12"/>
+                        <circle class="arc-ring-progress" id="arc-cpu" cx="200" cy="200" r="145"
+                                fill="none" stroke="var(--accent-purple)" stroke-width="12"
+                                stroke-dasharray="911.06" stroke-dashoffset="911.06"
+                                stroke-linecap="round" transform="rotate(-90 200 200)"
+                                opacity="0.7"/>
+                        <!-- RAM arc (inner ring) -->
+                        <circle cx="200" cy="200" r="125" fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="12"/>
+                        <circle class="arc-ring-progress" id="arc-ram" cx="200" cy="200" r="125"
+                                fill="none" stroke="var(--accent-cyan)" stroke-width="12"
+                                stroke-dasharray="785.4" stroke-dashoffset="785.4"
+                                stroke-linecap="round" transform="rotate(-90 200 200)"
+                                opacity="0.7"/>
+                        <!-- GPU arc (innermost ring) -->
+                        <circle cx="200" cy="200" r="105" fill="none" stroke="rgba(0,230,118,0.1)" stroke-width="10"/>
+                        <circle class="arc-ring-progress" id="arc-gpu" cx="200" cy="200" r="105"
+                                fill="none" stroke="var(--accent-green)" stroke-width="10"
+                                stroke-dasharray="659.73" stroke-dashoffset="659.73"
+                                stroke-linecap="round" transform="rotate(-90 200 200)"
+                                opacity="0.7"/>
+                        <!-- Inner spinning ring (decorative) -->
+                        <circle class="arc-spin" cx="200" cy="200" r="82"
+                                fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="1"
+                                stroke-dasharray="20 30 10 40"/>
+                        <circle class="arc-spin-reverse" cx="200" cy="200" r="75"
+                                fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="1"
+                                stroke-dasharray="15 25 5 35"/>
+                        <!-- Center core -->
+                        <circle cx="200" cy="200" r="55" fill="rgba(0,200,232,0.03)"
+                                stroke="rgba(0,200,232,0.2)" stroke-width="1"/>
+                        <circle class="core-pulse" cx="200" cy="200" r="40"
+                                fill="rgba(0,200,232,0.05)" stroke="rgba(0,200,232,0.3)" stroke-width="1.5"/>
+                        <circle cx="200" cy="200" r="6" fill="#00c8e8" opacity="0.8" filter="url(#glow)"/>
+                        <!-- Glow filter -->
+                        <defs>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+                    </svg>
+                    <!-- Center status text overlay -->
+                    <div class="arc-center-info">
+                        <div class="arc-state" id="arc-state">STANDBY</div>
+                        <div class="arc-uptime" id="arc-uptime">0.0h</div>
+                        <div class="arc-interactions" id="arc-interactions">0 interactions</div>
+                    </div>
+                    <!-- Ring labels -->
+                    <div class="ring-label ring-label-cpu" id="ring-label-cpu">CPU 0%</div>
+                    <div class="ring-label ring-label-ram" id="ring-label-ram">RAM 0%</div>
+                    <div class="ring-label ring-label-gpu" id="ring-label-gpu">GPU 0%</div>
+                </div>
+
+                <!-- Satellite panels -->
+                <!-- Top-left: Weather -->
+                <div class="sat-panel sat-weather" id="sat-weather">
+                    <svg class="sat-connector" id="conn-weather"><line x1="100%" y1="100%" x2="0" y2="0" stroke="rgba(0,200,232,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket">
+                        <div class="sat-title">WEATHER</div>
+                        <div class="sat-body">
+                            <div class="weather-icon" id="weather-icon">☀</div>
+                            <div class="weather-temp" id="weather-temp">--°</div>
+                            <div class="weather-desc" id="weather-desc">Loading...</div>
+                            <div class="weather-details" id="weather-details"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top-right: Calendar -->
+                <div class="sat-panel sat-calendar" id="sat-calendar">
+                    <svg class="sat-connector" id="conn-calendar"><line x1="0" y1="100%" x2="100%" y2="0" stroke="rgba(0,230,118,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket sat-bracket-green">
+                        <div class="sat-title">NEXT EVENT</div>
+                        <div class="sat-body">
+                            <div class="cal-countdown" id="cal-countdown">--</div>
+                            <div class="cal-event-name" id="cal-event-name">No events</div>
+                            <div class="cal-event-time" id="cal-event-time"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Left: Email -->
+                <div class="sat-panel sat-email" id="sat-email">
+                    <svg class="sat-connector" id="conn-email"><line x1="100%" y1="50%" x2="0" y2="50%" stroke="rgba(255,82,82,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket sat-bracket-red">
+                        <div class="sat-title">COMMS <span class="email-badge" id="email-badge">0</span></div>
+                        <div class="sat-body">
+                            <div class="email-stack" id="email-stack"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Spotify -->
+                <div class="sat-panel sat-spotify" id="sat-spotify">
+                    <svg class="sat-connector" id="conn-spotify"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(29,185,84,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket sat-bracket-spotify">
+                        <div class="sat-title">MEDIA</div>
+                        <div class="sat-body">
+                            <div class="spotify-vinyl-container">
+                                <div class="vinyl-disc" id="vinyl-disc">
+                                    <div class="vinyl-label" id="vinyl-label">♪</div>
+                                </div>
+                                <div class="spotify-info">
+                                    <div class="spotify-track" id="spotify-track">Nothing playing</div>
+                                    <div class="spotify-artist" id="spotify-artist"></div>
+                                    <div class="spotify-controls">
+                                        <button class="sp-btn" data-action="previous">⏮</button>
+                                        <button class="sp-btn sp-play" data-action="play" id="sp-play-btn">▶</button>
+                                        <button class="sp-btn" data-action="next">⏭</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom-left: Lights -->
+                <div class="sat-panel sat-lights" id="sat-lights">
+                    <svg class="sat-connector" id="conn-lights"><line x1="100%" y1="0" x2="0" y2="100%" stroke="rgba(255,235,59,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket sat-bracket-yellow">
+                        <div class="sat-title">ENVIRONMENT</div>
+                        <div class="sat-body">
+                            <div class="light-bulbs" id="light-bulbs"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom-right: System -->
+                <div class="sat-panel sat-system" id="sat-system">
+                    <svg class="sat-connector" id="conn-system"><line x1="0" y1="0" x2="100%" y2="100%" stroke="rgba(179,136,255,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
+                    <div class="sat-bracket sat-bracket-purple">
+                        <div class="sat-title">TELEMETRY</div>
+                        <div class="sat-body">
+                            <div class="telemetry-grid">
+                                <div class="tele-item">
+                                    <svg class="mini-ring" viewBox="0 0 60 60">
+                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(179,136,255,0.15)" stroke-width="5"/>
+                                        <circle class="mini-ring-fill" id="mini-cpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-purple)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                    </svg>
+                                    <span class="tele-val" id="tele-cpu">0%</span>
+                                    <span class="tele-lbl">CPU</span>
+                                </div>
+                                <div class="tele-item">
+                                    <svg class="mini-ring" viewBox="0 0 60 60">
+                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="5"/>
+                                        <circle class="mini-ring-fill" id="mini-ram" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-cyan)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                    </svg>
+                                    <span class="tele-val" id="tele-ram">0%</span>
+                                    <span class="tele-lbl">RAM</span>
+                                </div>
+                                <div class="tele-item">
+                                    <svg class="mini-ring" viewBox="0 0 60 60">
+                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,230,118,0.15)" stroke-width="5"/>
+                                        <circle class="mini-ring-fill" id="mini-gpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-green)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                    </svg>
+                                    <span class="tele-val" id="tele-gpu">0%</span>
+                                    <span class="tele-lbl">GPU</span>
+                                </div>
+                            </div>
+                            <div class="tele-uptime" id="tele-uptime">Uptime: --</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom ticker -->
+                <div class="hud-ticker">
+                    <div class="ticker-content" id="ticker-content">
+                        JARVIS SYSTEMS ONLINE ── INITIALIZING DATA FEEDS...
+                    </div>
+                </div>
+
+                <!-- Radial quick actions (bottom center) -->
+                <div class="radial-actions" id="radial-actions">
+                    <button class="radial-btn" data-action="lights off" title="Lights Off">
+                        <span class="radial-icon">💡</span>
+                    </button>
+                    <button class="radial-btn" data-action="play music" title="Play Music">
+                        <span class="radial-icon">🎵</span>
+                    </button>
+                    <button class="radial-btn" data-action="read emails" title="Read Emails">
+                        <span class="radial-icon">📧</span>
+                    </button>
+                    <button class="radial-btn" data-action="lock pc" title="Lock PC">
+                        <span class="radial-icon">🔒</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- BRAIN PAGE -->
+            <section id="page-brain" class="page">
+                <div class="stats-layer">
+                    <div class="stat-card">
+                        <div class="stat-value" id="brain-cost">$0.00</div>
+                        <div class="stat-label">API COST TODAY</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="brain-tokens">0k</div>
+                        <div class="stat-label">TOKENS USED</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="brain-latency">0.0s</div>
+                        <div class="stat-label">AVG LATENCY</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="brain-calls">0</div>
+                        <div class="stat-label">CONVERSATIONS</div>
+                    </div>
+                </div>
+                <div class="grid-2-col" style="margin-top: 1rem;">
+                    <div class="card">
+                        <h3>COST TRAJECTORY</h3>
+                        <canvas id="cost-chart"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3>TOKEN BREAKDOWN</h3>
+                        <canvas id="token-chart"></canvas>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 1rem;">
+                    <h3>VOICE INTERACTION LOG</h3>
+                    <div class="table-container">
+                        <table id="voice-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Direction</th>
+                                    <th>Message</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BRIEFING PAGE -->
+            <section id="page-briefing" class="page">
+                <div class="briefing-header">
+                    <h2 id="briefing-greeting" class="text-cyan">Generating Briefing...</h2>
+                    <p id="briefing-weather" style="opacity: 0.8"></p>
+                    <div class="briefing-actions" style="margin-top:1rem;">
+                        <button class="action-btn" id="btn-refresh-briefing">Refresh Data</button>
+                        <button class="action-btn border-orange" id="btn-audio-briefing">Audio Briefing</button>
+                    </div>
+                </div>
+                <div class="card border-orange" style="margin-top:2rem">
+                    <h3>AGENDA</h3>
+                    <div id="briefing-agenda-list" class="timeline"></div>
+                </div>
+                <div class="card border-cyan" style="margin-top:1rem">
+                    <h3>NEWS INTEL</h3>
+                    <div id="briefing-news-list"></div>
+                </div>
+                <div class="card border-purple" style="margin-top:1rem">
+                    <h3>MEMORY & PRIORITIES</h3>
+                    <ul id="briefing-memory-list" class="sleek-list"></ul>
+                </div>
+                <div class="card border-green" style="margin-top:1rem">
+                    <h3>SUGGESTED ACTIONS</h3>
+                    <div id="briefing-suggestions-list" class="action-grid"></div>
+                </div>
+            </section>
+
+            <!-- PROJECTS PAGE -->
+            <section id="page-projects" class="page">
+                <div class="card hero-card" id="active-project-card">
+                    <div class="proj-header">
+                        <h2 id="proj-name">PROJECT NAME</h2>
+                        <span class="badge" id="proj-status">STATUS</span>
+                    </div>
+                    <p id="proj-desc" style="opacity: 0.8;">...</p>
+                    <div class="proj-meta">
+                        <span><b class="text-cyan">Branch:</b> <span id="proj-branch">...</span></span>
+                        <span><b class="text-cyan">Path:</b> <span id="proj-path">...</span></span>
+                    </div>
+                    <select id="project-switcher" class="styled-select" style="margin-top:10px;"></select>
+                </div>
+                <div class="grid-2-col" style="margin-top: 1rem;">
+                    <div class="card border-purple">
+                        <h3>GIT ACTIVITY</h3>
+                        <div id="git-log" class="git-timeline"></div>
+                    </div>
+                    <div class="card border-orange">
+                        <h3>TODO MATRIX</h3>
+                        <div class="todo-input-row">
+                            <input type="text" id="new-todo-input" placeholder="New objective..." class="styled-input">
+                            <button id="btn-add-todo" class="action-btn">ADD</button>
+                        </div>
+                        <ul id="todo-list" class="sleek-list"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CLAUDE IDE PAGE -->
+            <section id="page-ide" class="page file-panel-layout">
+                <div class="panel" id="ide-explorer">
+                    <div class="panel-header">EXPLORER</div>
+                    <div class="explorer-content" id="file-tree"></div>
+                </div>
+                <div class="panel-resizer" id="resizer-1"></div>
+                <div class="panel" id="ide-terminal">
+                    <div class="panel-header" id="terminal-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="term-dot" id="term-dot"></span>
+                            <span>CLAUDE TERMINAL</span>
+                            <span class="term-status" id="term-status">READY</span>
+                        </div>
+                        <div style="display:flex; gap:4px;">
+                            <button class="sm-btn" id="term-clear">CLEAR</button>
+                            <button class="sm-btn term-stop-btn" id="term-stop" style="display:none;">STOP</button>
+                            <button class="sm-btn" id="term-toggle">RAW/MD</button>
+                        </div>
+                    </div>
+                    <div class="terminal-output" id="terminal-output"></div>
+                    <div class="image-preview" id="image-preview">
+                        <img id="preview-thumb" src="" alt="screenshot">
+                        <button class="sm-btn remove-img" id="btn-remove-img">REMOVE</button>
+                        <span style="margin-left:auto; font-size:0.8rem; opacity:0.5;">Sent with next message</span>
+                    </div>
+                    <div class="terminal-input-wrapper">
+                        <textarea id="terminal-input" placeholder="Enter command for Claude... (Ctrl+V to paste screenshot)" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="panel-resizer" id="resizer-2"></div>
+                <div class="panel" id="ide-preview">
+                    <div class="panel-header">PREVIEW: <span id="preview-filename">None</span></div>
+                    <div class="preview-content">
+                        <pre><code id="preview-code" class="language-python">Select a file to preview.</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS PAGE -->
+            <section id="page-settings" class="page">
+                <div class="grid-2-col">
+                    <div class="card">
+                        <h3>API LINK STATUS</h3>
+                        <div id="settings-api-status" class="settings-grid">Loading...</div>
+                        <button class="action-btn" id="btn-refresh-status" style="margin-top:10px;">Check Status</button>
+                    </div>
+                    <div class="card border-orange">
+                        <h3>SYSTEM PARAMS</h3>
+                        <div class="form-group">
+                            <label>TTS Engine</label>
+                            <select id="set-tts-engine" class="styled-select">
+                                <option value="kokoro">Kokoro (Local)</option>
+                                <option value="elevenlabs">ElevenLabs</option>
+                                <option value="edge">Edge TTS</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Default Language</label>
+                            <select id="set-language" class="styled-select">
+                                <option value="en">English</option>
+                                <option value="ro">Romanian</option>
+                            </select>
+                        </div>
+                        <button class="action-btn text-green" id="btn-save-settings" style="margin-top:10px;">SAVE CONFIG</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Image fullscreen overlay -->
+    <div class="img-overlay" id="img-overlay" onclick="this.style.display='none'">
+        <img id="overlay-img" src="">
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- External Libs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/pages/home.js"></script>
+    <script src="/static/js/pages/brain.js"></script>
+    <script src="/static/js/pages/briefing.js"></script>
+    <script src="/static/js/pages/projects.js"></script>
+    <script src="/static/js/pages/ide.js"></script>
+    <script src="/static/js/pages/settings.js"></script>
+</body>
+</html>
