@@ -269,8 +269,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Init when IDE page opened
     let initialized = false;
-    document.querySelector('.nav-item[data-target="page-ide"]').addEventListener('click', () => {
-        if(!initialized) {
+    window.addEventListener('page-expanded', (e) => {
+        if (e.detail.pageId === 'page-ide' && !initialized) {
             loadExplorer();
             connectWS();
             initialized = true;

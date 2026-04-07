@@ -123,5 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.querySelector('.nav-item[data-target="page-projects"]').addEventListener('click', loadProjects);
+    window.addEventListener('page-expanded', (e) => {
+        if (e.detail.pageId === 'page-projects') loadProjects();
+    });
 });

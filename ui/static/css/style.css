@@ -10,11 +10,10 @@
     --accent-purple: #b388ff;
     --text-main: #e0f2f1;
     --text-muted: rgba(224, 242, 241, 0.6);
-    --sidebar-width: 240px;
-    --sidebar-collapsed: 70px;
     --glow-cyan: 0 0 10px rgba(0, 200, 232, 0.2);
     --font-heading: 'Orbitron', sans-serif;
     --font-body: 'Share Tech Mono', monospace;
+    --transition-speed: 350ms;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -42,73 +41,32 @@ h1, h2, h3, h4, h5, h6, .logo-text, #page-title {
 .text-green { color: var(--accent-green); }
 .text-purple { color: var(--accent-purple); }
 
-/* Sidebar */
-.sidebar {
-    width: var(--sidebar-width);
-    background: rgba(2, 6, 13, 0.8);
-    border-right: 1px solid var(--border-light);
-    display: flex;
-    flex-direction: column;
-    transition: width 0.3s ease;
-    backdrop-filter: blur(10px);
-    z-index: 100;
-}
-.sidebar.collapsed { width: var(--sidebar-collapsed); }
-.sidebar.collapsed .logo-text, .sidebar.collapsed .nav-text { display: none; }
-
-.logo-container {
-    padding: 20px;
-    border-bottom: 1px solid var(--border-light);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 70px;
-}
-.logo-text { color: var(--accent-cyan); font-size: 1.2rem; text-shadow: var(--glow-cyan); }
-
-.nav-links { list-style: none; padding: 20px 0; flex: 1; }
-.nav-item {
-    padding: 15px 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    border-left: 3px solid transparent;
-    transition: all 0.2s;
-}
-.nav-item:hover, .nav-item.active {
-    background: var(--card-bg-hover);
-    border-left-color: var(--accent-cyan);
-    color: var(--accent-cyan);
-}
-.nav-item .icon { font-size: 1.2rem; }
-.nav-item .nav-text { font-size: 1.1rem; }
-
-.toggle-btn {
-    background: none; border: none; border-top: 1px solid var(--border-light);
-    color: var(--text-muted); padding: 15px; cursor: pointer;
-    font-family: var(--font-heading); font-size: 1.2rem;
-}
-.toggle-btn:hover { color: var(--accent-cyan); }
-
-/* Main Content */
+/* Main Content — fills entire viewport */
 .main-content {
-    flex: 1;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
 }
 
+/* Top Bar — translucent floating */
 .top-bar {
-    height: 70px;
-    border-bottom: 1px solid var(--border-light);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 30px;
-    background: rgba(2, 6, 13, 0.4);
-    backdrop-filter: blur(5px);
+    background: transparent;
+    z-index: 50;
+    pointer-events: none;
 }
+.top-bar > * { pointer-events: auto; }
 
 .top-bar-right { display: flex; align-items: center; gap: 30px; }
 .clock { font-size: 1.2rem; text-align: right; color: var(--accent-cyan); }
@@ -128,12 +86,12 @@ h1, h2, h3, h4, h5, h6, .logo-text, #page-title {
 @keyframes pulse { 0% { opacity: 0.6; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); } }
 @keyframes fast-pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
 
-/* Pages Container */
-.pages-container { flex: 1; position: relative; overflow-y: auto; overflow-x: hidden; padding: 20px; }
-.page { display: none; height: 100%; animation: fade-in 0.3s; position: relative; }
+/* Pages Container — hidden when at Level 0, pages live inside expanded-panel */
+.pages-container { display: none; }
+.page { display: none; height: 100%; position: relative; }
 .page.active { display: block; }
-
-@keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+/* IDE needs flex */
+.page.file-panel-layout.active { display: flex; }
 
 /* Cards Array */
 .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
@@ -359,7 +317,8 @@ tr:hover { background: rgba(255,255,255,0.02); }
    ═══════════════════════════════════════════════════════════════ */
 
 #page-home {
-    position: relative;
+    position: absolute;
+    inset: 0;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -367,16 +326,21 @@ tr:hover { background: rgba(255,255,255,0.02); }
 }
 #page-home.active { display: flex; }
 
-/* ── Background grid ── */
+/* ── Background grid — slowly drifts ── */
 .hud-grid-bg {
     position: absolute;
-    inset: 0;
+    inset: -20px;
     background-image:
         linear-gradient(rgba(0,200,232,0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,200,232,0.03) 1px, transparent 1px);
     background-size: 40px 40px;
     pointer-events: none;
     z-index: 0;
+    animation: grid-drift 60s linear infinite;
+}
+@keyframes grid-drift {
+    0%   { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
 }
 
 /* ── Particles ── */
@@ -414,9 +378,10 @@ tr:hover { background: rgba(255,255,255,0.02); }
     position: absolute;
     left: 0;
     width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(0,200,232,0.08), transparent);
-    animation: scanline-sweep 8s linear infinite;
+    height: 3px;
+    background: linear-gradient(90deg, transparent 10%, rgba(0,200,232,0.12) 40%, rgba(0,200,232,0.15) 50%, rgba(0,200,232,0.12) 60%, transparent 90%);
+    animation: scanline-sweep 6s linear infinite;
+    box-shadow: 0 0 15px rgba(0,200,232,0.05);
 }
 @keyframes scanline-sweep {
     0%   { top: -2px; }
@@ -439,39 +404,111 @@ tr:hover { background: rgba(255,255,255,0.02); }
 .hud-corner.bl { bottom: 10px; left: 10px; border-bottom-width: 2px; border-left-width: 2px; }
 .hud-corner.br { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; }
 
-/* ── Arc Reactor ── */
+/* ── Arc Reactor — Breathing Brain Core ── */
 .arc-reactor-container {
     position: relative;
     width: 400px;
     height: 400px;
     z-index: 5;
     flex-shrink: 0;
+    animation: reactor-breathe 4s ease-in-out infinite;
 }
+@keyframes reactor-breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.03); }
+}
+
+/* Ambient aura glow behind reactor */
+.reactor-aura {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 120%; height: 120%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,200,232,0.08) 0%, rgba(0,200,232,0.03) 40%, transparent 70%);
+    animation: aura-pulse 4s ease-in-out infinite;
+    pointer-events: none;
+}
+.reactor-aura-2 {
+    width: 160%; height: 160%;
+    background: radial-gradient(circle, rgba(0,200,232,0.04) 0%, transparent 60%);
+    animation: aura-pulse 6s ease-in-out infinite 1s;
+}
+@keyframes aura-pulse {
+    0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+    50%      { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
 .arc-reactor {
     width: 100%;
     height: 100%;
-    filter: drop-shadow(0 0 20px rgba(0,200,232,0.15));
+    filter: drop-shadow(0 0 30px rgba(0,200,232,0.2));
+    position: relative;
+    z-index: 1;
+}
+
+/* Expanding ripple rings from core */
+.ripple-ring {
+    animation: ripple-expand 4s ease-out infinite;
+    transform-origin: 200px 200px;
+}
+.ripple-2 { animation-delay: 1.3s; }
+.ripple-3 { animation-delay: 2.6s; }
+@keyframes ripple-expand {
+    0%   { r: 40; opacity: 0.3; stroke-width: 1.5; }
+    100% { r: 195; opacity: 0; stroke-width: 0.2; }
 }
 
 /* Spinning decorative rings */
 .arc-spin {
-    animation: spin-cw 30s linear infinite;
+    animation: spin-cw 20s linear infinite;
     transform-origin: 200px 200px;
 }
 .arc-spin-reverse {
-    animation: spin-ccw 45s linear infinite;
+    animation: spin-ccw 30s linear infinite;
+    transform-origin: 200px 200px;
+}
+.arc-spin-fast {
+    animation: spin-cw 12s linear infinite;
     transform-origin: 200px 200px;
 }
 @keyframes spin-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes spin-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 
-/* Core pulse */
+/* Core pulse — multi-layered breathing */
 .core-pulse {
     animation: core-glow 3s ease-in-out infinite;
 }
+.core-pulse-inner {
+    animation: core-glow-inner 2.5s ease-in-out infinite 0.5s;
+}
+.core-center-dot {
+    animation: core-dot-pulse 2s ease-in-out infinite;
+}
 @keyframes core-glow {
-    0%, 100% { opacity: 0.4; r: 40; }
-    50%      { opacity: 0.8; r: 45; }
+    0%, 100% { opacity: 0.3; r: 45; }
+    50%      { opacity: 0.7; r: 52; }
+}
+@keyframes core-glow-inner {
+    0%, 100% { opacity: 0.4; r: 30; }
+    50%      { opacity: 0.9; r: 35; }
+}
+@keyframes core-dot-pulse {
+    0%, 100% { opacity: 0.6; r: 4; }
+    50%      { opacity: 1; r: 6; }
+}
+
+/* Energy rays */
+.energy-ray {
+    stroke: rgba(0,200,232,0.06);
+    stroke-width: 0.8;
+    animation: ray-flicker 3s ease-in-out infinite;
+}
+@keyframes ray-flicker {
+    0%, 100% { opacity: 0.2; }
+    30%      { opacity: 0.8; }
+    60%      { opacity: 0.1; }
+    80%      { opacity: 0.6; }
 }
 
 /* Progress ring transitions */
@@ -521,88 +558,175 @@ tr:hover { background: rgba(255,255,255,0.02); }
 .ring-label-ram { bottom: 50%; right: -5px; color: var(--accent-cyan); }
 .ring-label-gpu { bottom: 44%; right: -5px; color: var(--accent-green); }
 
-/* ── Satellite Panels ── */
-.sat-panel {
+/* ══════════════════════════════════════
+   DATA ISLANDS — Draggable Neural Nodes
+   ══════════════════════════════════════ */
+
+.data-island {
     position: absolute;
     z-index: 10;
-    animation: sat-enter 0.6s ease-out both;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    user-select: none;
+    /* transforms set by JS — includes float offset */
+    transition: width 0.4s, height 0.4s, box-shadow 0.3s, border-color 0.3s;
+    will-change: transform;
 }
-.sat-panel:nth-child(6)  { animation-delay: 0.1s; }
-.sat-panel:nth-child(7)  { animation-delay: 0.2s; }
-.sat-panel:nth-child(8)  { animation-delay: 0.3s; }
-.sat-panel:nth-child(9)  { animation-delay: 0.4s; }
-.sat-panel:nth-child(10) { animation-delay: 0.5s; }
-.sat-panel:nth-child(11) { animation-delay: 0.6s; }
+.data-island:active { cursor: grabbing; }
+.data-island.dragging { z-index: 50; cursor: grabbing; }
 
-@keyframes sat-enter {
-    from { opacity: 0; transform: scale(0.9) translateY(10px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* Connector lines from panels to center */
-.sat-connector {
+/* The visible circle */
+.island-ring {
     position: absolute;
-    width: 60px;
-    height: 60px;
-    pointer-events: none;
-    z-index: -1;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(5, 13, 26, 0.7);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(0, 200, 232, 0.25);
+    box-shadow: 0 0 12px rgba(0, 200, 232, 0.06), inset 0 0 20px rgba(0, 200, 232, 0.03);
+    transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow: hidden;
 }
-
-/* Panel bracket container */
-.sat-bracket {
-    background: rgba(5,13,26,0.75);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(0,200,232,0.15);
-    padding: 14px 18px;
-    min-width: 200px;
-    max-width: 280px;
-    position: relative;
-}
-/* Corner bracket decorations on panels */
-.sat-bracket::before, .sat-bracket::after {
+/* Sweep glow inside ring */
+.island-ring::after {
     content: '';
     position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: rgba(0,200,232,0.4);
-    border-style: solid;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,200,232,0.06), transparent);
+    animation: island-sweep 6s linear infinite;
     pointer-events: none;
 }
-.sat-bracket::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-.sat-bracket::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+@keyframes island-sweep { 0% { left: -60%; } 100% { left: 160%; } }
 
-/* Color variants for brackets */
-.sat-bracket-green::before, .sat-bracket-green::after { border-color: rgba(0,230,118,0.4); }
-.sat-bracket-green { border-color: rgba(0,230,118,0.15); }
-.sat-bracket-red::before, .sat-bracket-red::after { border-color: rgba(255,82,82,0.4); }
-.sat-bracket-red { border-color: rgba(255,82,82,0.15); }
-.sat-bracket-spotify::before, .sat-bracket-spotify::after { border-color: rgba(29,185,84,0.4); }
-.sat-bracket-spotify { border-color: rgba(29,185,84,0.15); }
-.sat-bracket-yellow::before, .sat-bracket-yellow::after { border-color: rgba(255,235,59,0.4); }
-.sat-bracket-yellow { border-color: rgba(255,235,59,0.15); }
-.sat-bracket-purple::before, .sat-bracket-purple::after { border-color: rgba(179,136,255,0.4); }
-.sat-bracket-purple { border-color: rgba(179,136,255,0.15); }
+/* Color variants */
+[data-color="cyan"]  .island-ring { border-color: rgba(0,200,232,0.25); }
+[data-color="green"] .island-ring { border-color: rgba(0,230,118,0.25); }
+[data-color="red"]   .island-ring { border-color: rgba(255,82,82,0.25); }
+[data-color="amber"] .island-ring { border-color: rgba(255,167,38,0.25); }
+[data-color="purple"].island-ring { border-color: rgba(179,136,255,0.25); }
+[data-color="spotify"].island-ring{ border-color: rgba(29,185,84,0.25); }
 
-.sat-title {
+/* Hover glow per color */
+.data-island:hover .island-ring,
+.data-island.dragging .island-ring {
+    box-shadow: 0 0 30px rgba(0,200,232,0.3), inset 0 0 20px rgba(0,200,232,0.05);
+    border-color: rgba(0,200,232,0.5);
+    transform: scale(1.08);
+}
+[data-color="green"]:hover .island-ring  { box-shadow: 0 0 30px rgba(0,230,118,0.3); border-color: rgba(0,230,118,0.5); }
+[data-color="red"]:hover .island-ring    { box-shadow: 0 0 30px rgba(255,82,82,0.3); border-color: rgba(255,82,82,0.5); }
+[data-color="amber"]:hover .island-ring  { box-shadow: 0 0 30px rgba(255,167,38,0.3); border-color: rgba(255,167,38,0.5); }
+[data-color="purple"]:hover .island-ring { box-shadow: 0 0 30px rgba(179,136,255,0.3); border-color: rgba(179,136,255,0.5); }
+[data-color="spotify"]:hover .island-ring{ box-shadow: 0 0 30px rgba(29,185,84,0.3); border-color: rgba(29,185,84,0.5); }
+
+/* Content inside island */
+.island-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px;
+    max-width: 100px;
+    overflow: hidden;
+}
+.island-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+}
+.island-value {
     font-family: var(--font-heading);
-    font-size: 0.7rem;
-    color: rgba(0,200,232,0.7);
-    letter-spacing: 2px;
-    margin-bottom: 10px;
-    text-transform: uppercase;
+    font-size: 1.1rem;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px rgba(0,200,232,0.3);
+    line-height: 1.2;
 }
-.sat-body {
-    font-size: 0.85rem;
-    line-height: 1.5;
+[data-color="green"] .island-value { color: var(--accent-green); }
+[data-color="red"]   .island-value { color: var(--accent-red); }
+[data-color="amber"] .island-value { color: var(--accent-amber); }
+[data-color="purple"] .island-value { color: var(--accent-purple); }
+
+.island-detail {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 95px;
+}
+.island-extra {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s;
+}
+.data-island:hover .island-extra {
+    max-height: 80px;
+    opacity: 1;
 }
 
-/* Panel positions */
-.sat-weather  { top: 5%;  left: 4%; }
-.sat-calendar { top: 5%;  right: 4%; }
-.sat-email    { top: 38%; left: 3%; }
-.sat-spotify  { top: 38%; right: 3%; }
-.sat-lights   { bottom: 12%; left: 4%; }
-.sat-system   { bottom: 12%; right: 4%; }
+/* Label below the island */
+.island-label {
+    position: absolute;
+    bottom: -18px;
+    font-family: var(--font-heading);
+    font-size: 0.5rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: color 0.3s;
+    z-index: 2;
+}
+.data-island:hover .island-label { color: var(--accent-cyan); }
+
+/* Smaller island variant */
+.data-island.island-sm { width: 95px; height: 95px; }
+.island-sm .island-content { max-width: 75px; padding: 8px; }
+
+/* Telemetry island — wider for 3 mini rings */
+#island-telemetry { width: 140px; height: 140px; }
+#island-telemetry .island-content { max-width: 130px; }
+#island-telemetry .telemetry-grid { gap: 6px; }
+#island-telemetry .mini-ring { width: 36px; height: 36px; }
+#island-telemetry .tele-val { font-size: 0.55rem; top: 10px; }
+
+/* Spotify — vinyl fits nicely in circle */
+#island-spotify .vinyl-disc { width: 40px; height: 40px; margin-bottom: 2px; }
+#island-spotify .spotify-controls { display: flex; gap: 4px; justify-content: center; }
+#island-spotify .sp-btn { width: 20px; height: 20px; font-size: 0.5rem; }
+
+/* Email island */
+#island-email .island-extra { max-height: 0; }
+#island-email:hover .island-extra { max-height: 60px; }
+#island-email .email-stack { max-height: 55px; overflow-y: auto; }
+#island-email .email-item { font-size: 0.55rem; gap: 4px; }
+#island-email .email-avatar { width: 16px; height: 16px; font-size: 0.5rem; }
+#island-email .email-badge {
+    background: var(--accent-red);
+    color: #fff;
+    font-size: 1rem;
+    padding: 0;
+    border-radius: 0;
+    font-family: var(--font-heading);
+}
+
+/* Light orbs — compact */
+#island-lights .light-bulbs { gap: 6px; justify-content: center; }
+#island-lights .light-orb { width: 22px; height: 22px; }
+#island-lights .light-orb-label { font-size: 0.4rem; bottom: -10px; }
 
 /* ── Weather panel ── */
 .weather-icon {
@@ -904,18 +1028,415 @@ tr:hover { background: rgba(255,255,255,0.02); }
     font-size: 1.1rem;
 }
 
-/* ── Responsive: shrink arc reactor on smaller screens ── */
+/* ── Responsive ── */
 @media (max-width: 1400px) {
     .arc-reactor-container { width: 320px; height: 320px; }
-    .sat-panel { transform: scale(0.9); }
+    .data-island { transform: scale(0.9); }
 }
 @media (max-width: 1100px) {
     .arc-reactor-container { width: 260px; height: 260px; }
-    .sat-panel { transform: scale(0.8); }
-    .sat-weather  { top: 2%;  left: 2%; }
-    .sat-calendar { top: 2%;  right: 2%; }
-    .sat-email    { top: 35%; left: 1%; }
-    .sat-spotify  { top: 35%; right: 1%; }
-    .sat-lights   { bottom: 14%; left: 2%; }
-    .sat-system   { bottom: 14%; right: 2%; }
+    .data-island { transform: scale(0.8); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NEURAL NETWORK NAVIGATION
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Synaptic Lines SVG overlay ── */
+.synapse-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 4;
+}
+.synapse-line {
+    stroke: rgba(0, 200, 232, 0.12);
+    stroke-width: 1;
+    stroke-dasharray: 6 4;
+    will-change: opacity;
+    transition: opacity var(--transition-speed) ease;
+}
+.synapse-pulse {
+    fill: #00c8e8;
+    filter: url(#synapse-glow);
+}
+
+/* ── Navigation Nodes ── */
+.nav-nodes-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 12;
+}
+
+.nav-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 12;
+    will-change: transform, opacity;
+    /* Center the node on its position + float */
+    transform: translate(-50%, -50%);
+    animation: node-float 6s ease-in-out infinite;
+}
+.nav-node:nth-child(1) { animation-delay: 0s; }
+.nav-node:nth-child(2) { animation-delay: 1s; animation-duration: 7s; }
+.nav-node:nth-child(3) { animation-delay: 2s; animation-duration: 5.5s; }
+.nav-node:nth-child(4) { animation-delay: 0.5s; animation-duration: 6.5s; }
+.nav-node:nth-child(5) { animation-delay: 1.5s; animation-duration: 7.5s; }
+.nav-node:nth-child(6) { animation-delay: 2.5s; animation-duration: 5s; }
+@keyframes node-float {
+    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+    50%      { transform: translate(-50%, -50%) translateY(-8px); }
+}
+
+.nav-node-circle {
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    background: rgba(5, 13, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 200, 232, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 8px rgba(0, 200, 232, 0.05);
+}
+
+/* Corner bracket decorations on nav circles */
+.nav-node-circle::before,
+.nav-node-circle::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: rgba(0, 200, 232, 0.4);
+    border-style: solid;
+    pointer-events: none;
+}
+.nav-node-circle::before {
+    top: -3px;
+    left: -3px;
+    border-width: 2px 0 0 2px;
+}
+.nav-node-circle::after {
+    bottom: -3px;
+    right: -3px;
+    border-width: 0 2px 2px 0;
+}
+
+.nav-node-icon {
+    font-size: 1.4rem;
+    color: var(--accent-cyan);
+    line-height: 1;
+    user-select: none;
+}
+
+.nav-node-label {
+    font-family: var(--font-heading);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+    user-select: none;
+}
+
+/* Hover state */
+.nav-node:hover .nav-node-circle {
+    box-shadow: 0 0 25px rgba(0, 200, 232, 0.4);
+    border-color: rgba(0, 200, 232, 0.6);
+    transform: scale(1.1);
+}
+.nav-node:hover .nav-node-label {
+    color: var(--accent-cyan);
+}
+
+/* Active node (HOME DATA when satellites visible) */
+.nav-node.active .nav-node-circle {
+    background: rgba(0, 200, 232, 0.12);
+    border-color: rgba(0, 200, 232, 0.5);
+    box-shadow: 0 0 15px rgba(0, 200, 232, 0.25);
+}
+
+/* Focused node (hovered) — other nodes dim */
+.nav-node.focused .nav-node-circle {
+    box-shadow: 0 0 35px rgba(0, 200, 232, 0.6), 0 0 60px rgba(0, 200, 232, 0.2);
+    border-color: rgba(0, 200, 232, 0.8);
+    background: rgba(0, 200, 232, 0.15);
+    transform: scale(1.15);
+}
+.nav-node.focused .nav-node-label {
+    color: #00c8e8;
+    text-shadow: 0 0 10px rgba(0, 200, 232, 0.5);
+}
+.nav-node.dimmed-node {
+    opacity: 0.4;
+    transition: opacity 0.4s ease;
+}
+.nav-node.dimmed-node .nav-node-circle {
+    transform: scale(0.95);
+}
+
+/* ── Micro-nodes (ambient floating neural particles) ── */
+.micro-node {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0, 200, 232, 0.3);
+    box-shadow: 0 0 6px rgba(0, 200, 232, 0.2);
+    pointer-events: none;
+    z-index: 3;
+    animation: micro-drift linear infinite;
+}
+@keyframes micro-drift {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.6; }
+    100% { transform: translate(var(--dx, 30px), var(--dy, -30px)); opacity: 0; }
+}
+
+/* Hover focus — whole scene shifts toward hovered node */
+#page-home {
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Nav node hover pulse ring */
+.nav-node-circle::after {
+    transition: all 0.3s ease;
+}
+.nav-node:hover .nav-node-circle::after {
+    width: 16px;
+    height: 16px;
+}
+.nav-node:hover .nav-node-circle::before {
+    width: 16px;
+    height: 16px;
+}
+
+/* ── Expanded Panel (Level 1) ── */
+.expanded-panel {
+    position: fixed;
+    top: 40px;
+    left: 40px;
+    right: 40px;
+    bottom: 40px;
+    background: rgba(5, 13, 26, 0.88);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(0, 200, 232, 0.2);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Corner bracket decorations */
+    opacity: 0;
+    transform: scale(0.3);
+    pointer-events: none;
+    transition: opacity 400ms ease, transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+}
+
+/* Large corner brackets on the panel */
+.expanded-panel::before,
+.expanded-panel::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: rgba(0, 200, 232, 0.4);
+    border-style: solid;
+    pointer-events: none;
+    z-index: 2;
+}
+.expanded-panel::before {
+    top: -1px;
+    left: -1px;
+    border-width: 2px 0 0 2px;
+}
+.expanded-panel::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 2px 2px 0;
+}
+
+/* Extra corner brackets (top-right, bottom-left) via inner element */
+.expanded-panel-corners {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+.expanded-panel-corners::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 22px;
+    height: 22px;
+    border-color: rgba(0, 200, 232, 0.4);
+    border-style: solid;
+    border-width: 2px 2px 0 0;
+}
+.expanded-panel-corners::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: -1px;
+    width: 22px;
+    height: 22px;
+    border-color: rgba(0, 200, 232, 0.4);
+    border-style: solid;
+    border-width: 0 0 2px 2px;
+}
+
+.expanded-panel.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+/* Fullscreen variant for IDE */
+.expanded-panel.fullscreen {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 0;
+}
+
+.expanded-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(0, 200, 232, 0.1);
+    flex-shrink: 0;
+}
+
+.expanded-panel-title {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    color: var(--accent-cyan);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.expanded-panel-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 200, 232, 0.2);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+    font-family: var(--font-body);
+}
+.expanded-panel-close:hover {
+    background: rgba(255, 82, 82, 0.2);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.expanded-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+/* No padding for IDE */
+.expanded-panel.fullscreen .expanded-panel-body {
+    padding: 0;
+}
+/* IDE page inside panel needs full height */
+.expanded-panel-body .page.file-panel-layout.active {
+    height: 100%;
+}
+
+/* Arc reactor dimmed state (decorative, visible through panel margins) */
+.arc-reactor-container.dimmed {
+    opacity: 0.15;
+    transform: scale(0.7);
+    transition: opacity var(--transition-speed) ease, transform var(--transition-speed) ease;
+    animation: none; /* stop breathing when dimmed */
+}
+/* Also dim the center info and ring labels */
+.arc-reactor-container.dimmed .arc-center-info,
+.arc-reactor-container.dimmed .ring-label {
+    opacity: 0;
+    transition: opacity 200ms ease;
+}
+
+/* ── Hub state transitions ── */
+/* When a panel is expanded, fade out islands, nodes, synapses */
+#page-home.panel-expanded .data-island,
+#page-home.panel-expanded .nav-nodes-container,
+#page-home.panel-expanded .synapse-svg,
+#page-home.panel-expanded .radial-actions,
+#page-home.panel-expanded .hud-ticker,
+#page-home.panel-expanded .micro-node {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 300ms ease;
+}
+
+#page-home .data-island,
+#page-home .nav-nodes-container,
+#page-home .synapse-svg,
+#page-home .radial-actions,
+#page-home .hud-ticker {
+    transition: opacity 300ms ease;
+}
+
+/* ── Responsive — neural nav ── */
+@media (max-width: 1200px) {
+    .nav-node-circle { width: 55px; height: 55px; }
+    .nav-node-icon { font-size: 1.2rem; }
+    .nav-node-label { font-size: 0.55rem; }
+}
+
+@media (max-width: 900px) {
+    /* Stack nodes in two rows below reactor */
+    .nav-nodes-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 16px;
+        position: absolute;
+        top: auto;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 360px;
+    }
+    .nav-node {
+        position: static !important;
+        animation: node-float-simple 6s ease-in-out infinite !important;
+    }
+    @keyframes node-float-simple {
+        0%, 100% { transform: translateY(0px); }
+        50%      { transform: translateY(-6px); }
+    }
+    .synapse-svg { display: none; }
+    .expanded-panel { top: 10px; left: 10px; right: 10px; bottom: 10px; }
 }

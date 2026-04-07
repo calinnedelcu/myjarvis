@@ -4,18 +4,26 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── Spawn background particles ──
+    // ── Spawn dense background particles ──
     const particleContainer = document.getElementById('hud-particles');
     if (particleContainer) {
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 100; i++) {
             const p = document.createElement('div');
             p.className = 'hud-particle';
             p.style.left = Math.random() * 100 + '%';
             p.style.bottom = '-5px';
-            p.style.animationDuration = (12 + Math.random() * 20) + 's';
-            p.style.animationDelay = (Math.random() * 15) + 's';
-            p.style.opacity = (0.2 + Math.random() * 0.5);
-            p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+            p.style.animationDuration = (10 + Math.random() * 25) + 's';
+            p.style.animationDelay = (Math.random() * 20) + 's';
+            p.style.opacity = (0.15 + Math.random() * 0.5);
+            const size = (1 + Math.random() * 2.5);
+            p.style.width = p.style.height = size + 'px';
+            // Some particles glow different colors
+            const roll = Math.random();
+            if (roll > 0.9) {
+                p.style.background = 'rgba(179,136,255,0.4)';
+            } else if (roll > 0.8) {
+                p.style.background = 'rgba(0,230,118,0.4)';
+            }
             particleContainer.appendChild(p);
         }
     }

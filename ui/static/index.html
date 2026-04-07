@@ -16,39 +16,11 @@
 </head>
 <body>
 
-    <!-- Sidebar -->
-    <nav class="sidebar" id="sidebar">
-        <div class="logo-container">
-            <h1 class="logo-text">[ J.A.R.V.I.S. ]</h1>
-        </div>
-        <ul class="nav-links">
-            <li class="nav-item active" data-target="page-home" title="Home">
-                <span class="icon">⊞</span> <span class="nav-text">Home</span>
-            </li>
-            <li class="nav-item" data-target="page-brain" title="Brain">
-                <span class="icon">◎</span> <span class="nav-text">Brain</span>
-            </li>
-            <li class="nav-item" data-target="page-briefing" title="Briefing">
-                <span class="icon">☼</span> <span class="nav-text">Briefing</span>
-            </li>
-            <li class="nav-item" data-target="page-projects" title="Projects">
-                <span class="icon">📁</span> <span class="nav-text">Projects</span>
-            </li>
-            <li class="nav-item" data-target="page-ide" title="Claude IDE">
-                <span class="icon">_></span> <span class="nav-text">Claude IDE</span>
-            </li>
-            <li class="nav-item" data-target="page-settings" title="Settings">
-                <span class="icon">⚙</span> <span class="nav-text">Settings</span>
-            </li>
-        </ul>
-        <button id="toggle-sidebar" class="toggle-btn" title="Toggle Sidebar">«</button>
-    </nav>
-
-    <!-- Main Content -->
+    <!-- Main Content — full viewport -->
     <div class="main-content">
-        <!-- Top Bar -->
+        <!-- Top Bar — translucent floating -->
         <header class="top-bar">
-            <h2 id="page-title">HOME OVERVIEW</h2>
+            <h2 id="page-title" style="color: var(--accent-cyan); font-size: 0.9rem; letter-spacing: 3px; text-shadow: 0 0 10px rgba(0,200,232,0.3);">J.A.R.V.I.S.</h2>
             <div class="top-bar-right">
                 <div class="status-indicator" title="Jarvis Status">
                     <span class="status-dot standby" id="jarvis-status-dot"></span>
@@ -61,11 +33,8 @@
             </div>
         </header>
 
-        <!-- Pages Container -->
-        <div class="pages-container">
-            
-            <!-- HOME PAGE -->
-            <section id="page-home" class="page active">
+        <!-- HOME PAGE — Neural Hub (always visible, fills viewport) -->
+        <section id="page-home" class="page active">
                 <!-- Background effects -->
                 <div class="hud-grid-bg"></div>
                 <div class="hud-particles" id="hud-particles"></div>
@@ -77,13 +46,45 @@
                 <div class="hud-corner bl"></div>
                 <div class="hud-corner br"></div>
 
-                <!-- Center Arc Reactor -->
+                <!-- Center Arc Reactor — Breathing Brain Core -->
                 <div class="arc-reactor-container">
+                    <!-- Ambient glow aura behind reactor -->
+                    <div class="reactor-aura"></div>
+                    <div class="reactor-aura reactor-aura-2"></div>
                     <svg class="arc-reactor" viewBox="0 0 400 400">
+                        <defs>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <filter id="glow-intense">
+                                <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <filter id="glow-wide">
+                                <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <radialGradient id="core-gradient" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#00c8e8" stop-opacity="0.4"/>
+                                <stop offset="40%" stop-color="#00c8e8" stop-opacity="0.15"/>
+                                <stop offset="100%" stop-color="#00c8e8" stop-opacity="0"/>
+                            </radialGradient>
+                        </defs>
+
+                        <!-- Expanding ripple rings (breathing outward) -->
+                        <circle class="ripple-ring" cx="200" cy="200" r="60" fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="0.5"/>
+                        <circle class="ripple-ring ripple-2" cx="200" cy="200" r="60" fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="0.5"/>
+                        <circle class="ripple-ring ripple-3" cx="200" cy="200" r="60" fill="none" stroke="rgba(0,200,232,0.08)" stroke-width="0.5"/>
+
+                        <!-- Energy rays radiating from center -->
+                        <g class="energy-rays" id="energy-rays"></g>
+
                         <!-- Outer decorative ring -->
                         <circle cx="200" cy="200" r="190" fill="none" stroke="rgba(0,200,232,0.08)" stroke-width="1"/>
                         <!-- Tick marks on outer ring -->
                         <g class="arc-ticks" id="arc-ticks"></g>
+
                         <!-- Calendar arc (outer ring) — 24h clock -->
                         <circle class="arc-ring arc-ring-outer" cx="200" cy="200" r="175"
                                 fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="18"/>
@@ -94,6 +95,7 @@
                         <!-- Time marker on calendar ring -->
                         <circle class="time-marker" id="time-marker" cx="200" cy="25" r="4"
                                 fill="#00c8e8" filter="url(#glow)"/>
+
                         <!-- CPU arc (middle ring) -->
                         <circle cx="200" cy="200" r="145" fill="none" stroke="rgba(179,136,255,0.1)" stroke-width="12"/>
                         <circle class="arc-ring-progress" id="arc-cpu" cx="200" cy="200" r="145"
@@ -115,26 +117,32 @@
                                 stroke-dasharray="659.73" stroke-dashoffset="659.73"
                                 stroke-linecap="round" transform="rotate(-90 200 200)"
                                 opacity="0.7"/>
-                        <!-- Inner spinning ring (decorative) -->
-                        <circle class="arc-spin" cx="200" cy="200" r="82"
-                                fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="1"
-                                stroke-dasharray="20 30 10 40"/>
-                        <circle class="arc-spin-reverse" cx="200" cy="200" r="75"
-                                fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="1"
+
+                        <!-- Inner spinning rings (faster, more dramatic) -->
+                        <circle class="arc-spin" cx="200" cy="200" r="88"
+                                fill="none" stroke="rgba(0,200,232,0.12)" stroke-width="1"
+                                stroke-dasharray="8 15 25 10"/>
+                        <circle class="arc-spin-reverse" cx="200" cy="200" r="82"
+                                fill="none" stroke="rgba(179,136,255,0.08)" stroke-width="1"
                                 stroke-dasharray="15 25 5 35"/>
-                        <!-- Center core -->
-                        <circle cx="200" cy="200" r="55" fill="rgba(0,200,232,0.03)"
-                                stroke="rgba(0,200,232,0.2)" stroke-width="1"/>
-                        <circle class="core-pulse" cx="200" cy="200" r="40"
-                                fill="rgba(0,200,232,0.05)" stroke="rgba(0,200,232,0.3)" stroke-width="1.5"/>
-                        <circle cx="200" cy="200" r="6" fill="#00c8e8" opacity="0.8" filter="url(#glow)"/>
-                        <!-- Glow filter -->
-                        <defs>
-                            <filter id="glow">
-                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                            </filter>
-                        </defs>
+                        <circle class="arc-spin-fast" cx="200" cy="200" r="68"
+                                fill="none" stroke="rgba(0,200,232,0.1)" stroke-width="0.5"
+                                stroke-dasharray="3 8 12 5"/>
+
+                        <!-- Neural web pattern inside core -->
+                        <g class="neural-web" id="neural-web" opacity="0.3"></g>
+
+                        <!-- Center core — multi-layered breathing -->
+                        <circle cx="200" cy="200" r="55" fill="url(#core-gradient)"
+                                stroke="rgba(0,200,232,0.15)" stroke-width="1"/>
+                        <circle class="core-pulse" cx="200" cy="200" r="45"
+                                fill="rgba(0,200,232,0.04)" stroke="rgba(0,200,232,0.25)" stroke-width="1.5"/>
+                        <circle class="core-pulse-inner" cx="200" cy="200" r="30"
+                                fill="rgba(0,200,232,0.06)" stroke="rgba(0,200,232,0.3)" stroke-width="1"/>
+                        <!-- Core center point with intense glow -->
+                        <circle cx="200" cy="200" r="12" fill="rgba(0,200,232,0.15)" filter="url(#glow-wide)"/>
+                        <circle cx="200" cy="200" r="8" fill="rgba(0,200,232,0.3)" filter="url(#glow-intense)"/>
+                        <circle class="core-center-dot" cx="200" cy="200" r="4" fill="#00c8e8" filter="url(#glow-intense)"/>
                     </svg>
                     <!-- Center status text overlay -->
                     <div class="arc-center-info">
@@ -148,115 +156,141 @@
                     <div class="ring-label ring-label-gpu" id="ring-label-gpu">GPU 0%</div>
                 </div>
 
-                <!-- Satellite panels -->
-                <!-- Top-left: Weather -->
-                <div class="sat-panel sat-weather" id="sat-weather">
-                    <svg class="sat-connector" id="conn-weather"><line x1="100%" y1="100%" x2="0" y2="0" stroke="rgba(0,200,232,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket">
-                        <div class="sat-title">WEATHER</div>
-                        <div class="sat-body">
-                            <div class="weather-icon" id="weather-icon">☀</div>
-                            <div class="weather-temp" id="weather-temp">--°</div>
-                            <div class="weather-desc" id="weather-desc">Loading...</div>
-                            <div class="weather-details" id="weather-details"></div>
+                <!-- Synaptic Lines SVG -->
+                <svg class="synapse-svg" id="synapse-svg">
+                    <!-- Lines drawn dynamically by JS -->
+                </svg>
+
+                <!-- Navigation Nodes (hexagonal around reactor) -->
+                <div class="nav-nodes-container" id="nav-nodes-container">
+                    <div class="nav-node active" id="node-home-data" data-page="home-data" style="top: 18%; left: 50%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">⊞</span>
                         </div>
+                        <span class="nav-node-label">HOME DATA</span>
+                    </div>
+                    <div class="nav-node" id="node-brain" data-page="page-brain" style="top: 30%; left: 75%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">◎</span>
+                        </div>
+                        <span class="nav-node-label">BRAIN</span>
+                    </div>
+                    <div class="nav-node" id="node-briefing" data-page="page-briefing" style="top: 65%; left: 75%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">☼</span>
+                        </div>
+                        <span class="nav-node-label">BRIEFING</span>
+                    </div>
+                    <div class="nav-node" id="node-projects" data-page="page-projects" style="top: 80%; left: 50%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">📁</span>
+                        </div>
+                        <span class="nav-node-label">PROJECTS</span>
+                    </div>
+                    <div class="nav-node" id="node-ide" data-page="page-ide" data-fullscreen="true" style="top: 65%; left: 25%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">_&gt;</span>
+                        </div>
+                        <span class="nav-node-label">CLAUDE IDE</span>
+                    </div>
+                    <div class="nav-node" id="node-settings" data-page="page-settings" style="top: 30%; left: 25%;">
+                        <div class="nav-node-circle">
+                            <span class="nav-node-icon">⚙</span>
+                        </div>
+                        <span class="nav-node-label">SETTINGS</span>
                     </div>
                 </div>
 
-                <!-- Top-right: Calendar -->
-                <div class="sat-panel sat-calendar" id="sat-calendar">
-                    <svg class="sat-connector" id="conn-calendar"><line x1="0" y1="100%" x2="100%" y2="0" stroke="rgba(0,230,118,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket sat-bracket-green">
-                        <div class="sat-title">NEXT EVENT</div>
-                        <div class="sat-body">
-                            <div class="cal-countdown" id="cal-countdown">--</div>
-                            <div class="cal-event-name" id="cal-event-name">No events</div>
-                            <div class="cal-event-time" id="cal-event-time"></div>
-                        </div>
+                <!-- Data Islands — draggable neural nodes -->
+                <div class="data-island" id="island-weather" data-color="cyan">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="island-icon" id="weather-icon">☀</div>
+                        <div class="island-value" id="weather-temp">--°</div>
+                        <div class="island-detail" id="weather-desc">Loading...</div>
+                        <div class="island-extra" id="weather-details"></div>
                     </div>
+                    <div class="island-label">WEATHER</div>
                 </div>
 
-                <!-- Left: Email -->
-                <div class="sat-panel sat-email" id="sat-email">
-                    <svg class="sat-connector" id="conn-email"><line x1="100%" y1="50%" x2="0" y2="50%" stroke="rgba(255,82,82,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket sat-bracket-red">
-                        <div class="sat-title">COMMS <span class="email-badge" id="email-badge">0</span></div>
-                        <div class="sat-body">
-                            <div class="email-stack" id="email-stack"></div>
-                        </div>
+                <div class="data-island" id="island-calendar" data-color="green">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="island-value" id="cal-countdown">--</div>
+                        <div class="island-detail" id="cal-event-name">No events</div>
+                        <div class="island-extra" id="cal-event-time"></div>
                     </div>
+                    <div class="island-label">SCHEDULE</div>
                 </div>
 
-                <!-- Right: Spotify -->
-                <div class="sat-panel sat-spotify" id="sat-spotify">
-                    <svg class="sat-connector" id="conn-spotify"><line x1="0" y1="50%" x2="100%" y2="50%" stroke="rgba(29,185,84,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket sat-bracket-spotify">
-                        <div class="sat-title">MEDIA</div>
-                        <div class="sat-body">
-                            <div class="spotify-vinyl-container">
-                                <div class="vinyl-disc" id="vinyl-disc">
-                                    <div class="vinyl-label" id="vinyl-label">♪</div>
-                                </div>
-                                <div class="spotify-info">
-                                    <div class="spotify-track" id="spotify-track">Nothing playing</div>
-                                    <div class="spotify-artist" id="spotify-artist"></div>
-                                    <div class="spotify-controls">
-                                        <button class="sp-btn" data-action="previous">⏮</button>
-                                        <button class="sp-btn sp-play" data-action="play" id="sp-play-btn">▶</button>
-                                        <button class="sp-btn" data-action="next">⏭</button>
-                                    </div>
-                                </div>
+                <div class="data-island" id="island-email" data-color="red">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="island-icon">✉</div>
+                        <div class="island-value"><span class="email-badge" id="email-badge">0</span></div>
+                        <div class="island-extra email-stack" id="email-stack"></div>
+                    </div>
+                    <div class="island-label">COMMS</div>
+                </div>
+
+                <div class="data-island" id="island-spotify" data-color="spotify">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="vinyl-disc" id="vinyl-disc">
+                            <div class="vinyl-label" id="vinyl-label">♪</div>
+                        </div>
+                        <div class="island-detail" id="spotify-track">Nothing playing</div>
+                        <div class="island-extra" id="spotify-artist"></div>
+                        <div class="island-extra spotify-controls">
+                            <button class="sp-btn" data-action="previous">⏮</button>
+                            <button class="sp-btn sp-play" data-action="play" id="sp-play-btn">▶</button>
+                            <button class="sp-btn" data-action="next">⏭</button>
+                        </div>
+                    </div>
+                    <div class="island-label">MEDIA</div>
+                </div>
+
+                <div class="data-island island-sm" id="island-lights" data-color="amber">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="island-icon">💡</div>
+                        <div class="island-extra light-bulbs" id="light-bulbs"></div>
+                    </div>
+                    <div class="island-label">LIGHTS</div>
+                </div>
+
+                <div class="data-island" id="island-telemetry" data-color="purple">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="telemetry-grid">
+                            <div class="tele-item">
+                                <svg class="mini-ring" viewBox="0 0 60 60">
+                                    <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(179,136,255,0.15)" stroke-width="5"/>
+                                    <circle class="mini-ring-fill" id="mini-cpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-purple)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                </svg>
+                                <span class="tele-val" id="tele-cpu">0%</span>
+                                <span class="tele-lbl">CPU</span>
+                            </div>
+                            <div class="tele-item">
+                                <svg class="mini-ring" viewBox="0 0 60 60">
+                                    <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="5"/>
+                                    <circle class="mini-ring-fill" id="mini-ram" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-cyan)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                </svg>
+                                <span class="tele-val" id="tele-ram">0%</span>
+                                <span class="tele-lbl">RAM</span>
+                            </div>
+                            <div class="tele-item">
+                                <svg class="mini-ring" viewBox="0 0 60 60">
+                                    <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,230,118,0.15)" stroke-width="5"/>
+                                    <circle class="mini-ring-fill" id="mini-gpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-green)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
+                                </svg>
+                                <span class="tele-val" id="tele-gpu">0%</span>
+                                <span class="tele-lbl">GPU</span>
                             </div>
                         </div>
+                        <div class="island-detail" id="tele-uptime">Uptime: --</div>
                     </div>
-                </div>
-
-                <!-- Bottom-left: Lights -->
-                <div class="sat-panel sat-lights" id="sat-lights">
-                    <svg class="sat-connector" id="conn-lights"><line x1="100%" y1="0" x2="0" y2="100%" stroke="rgba(255,235,59,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket sat-bracket-yellow">
-                        <div class="sat-title">ENVIRONMENT</div>
-                        <div class="sat-body">
-                            <div class="light-bulbs" id="light-bulbs"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bottom-right: System -->
-                <div class="sat-panel sat-system" id="sat-system">
-                    <svg class="sat-connector" id="conn-system"><line x1="0" y1="0" x2="100%" y2="100%" stroke="rgba(179,136,255,0.15)" stroke-width="1" stroke-dasharray="4 4"/></svg>
-                    <div class="sat-bracket sat-bracket-purple">
-                        <div class="sat-title">TELEMETRY</div>
-                        <div class="sat-body">
-                            <div class="telemetry-grid">
-                                <div class="tele-item">
-                                    <svg class="mini-ring" viewBox="0 0 60 60">
-                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(179,136,255,0.15)" stroke-width="5"/>
-                                        <circle class="mini-ring-fill" id="mini-cpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-purple)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
-                                    </svg>
-                                    <span class="tele-val" id="tele-cpu">0%</span>
-                                    <span class="tele-lbl">CPU</span>
-                                </div>
-                                <div class="tele-item">
-                                    <svg class="mini-ring" viewBox="0 0 60 60">
-                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,200,232,0.15)" stroke-width="5"/>
-                                        <circle class="mini-ring-fill" id="mini-ram" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-cyan)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
-                                    </svg>
-                                    <span class="tele-val" id="tele-ram">0%</span>
-                                    <span class="tele-lbl">RAM</span>
-                                </div>
-                                <div class="tele-item">
-                                    <svg class="mini-ring" viewBox="0 0 60 60">
-                                        <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(0,230,118,0.15)" stroke-width="5"/>
-                                        <circle class="mini-ring-fill" id="mini-gpu" cx="30" cy="30" r="24" fill="none" stroke="var(--accent-green)" stroke-width="5" stroke-dasharray="150.8" stroke-dashoffset="150.8" stroke-linecap="round" transform="rotate(-90 30 30)"/>
-                                    </svg>
-                                    <span class="tele-val" id="tele-gpu">0%</span>
-                                    <span class="tele-lbl">GPU</span>
-                                </div>
-                            </div>
-                            <div class="tele-uptime" id="tele-uptime">Uptime: --</div>
-                        </div>
-                    </div>
+                    <div class="island-label">TELEMETRY</div>
                 </div>
 
                 <!-- Bottom ticker -->
@@ -281,8 +315,10 @@
                         <span class="radial-icon">🔒</span>
                     </button>
                 </div>
-            </section>
+        </section>
 
+        <!-- Pages Container (hidden — pages are moved into expanded-panel on demand) -->
+        <div class="pages-container">
             <!-- BRAIN PAGE -->
             <section id="page-brain" class="page">
                 <div class="stats-layer">
@@ -456,6 +492,18 @@
                     </div>
                 </div>
             </section>
+        </div>
+    </div>
+
+    <!-- Expanded Panel (Level 1) -->
+    <div class="expanded-panel" id="expanded-panel">
+        <div class="expanded-panel-corners"></div>
+        <div class="expanded-panel-header">
+            <span class="expanded-panel-title" id="expanded-panel-title">PAGE</span>
+            <button class="expanded-panel-close" id="expanded-panel-close" title="Close">&times;</button>
+        </div>
+        <div class="expanded-panel-body" id="expanded-panel-body">
+            <!-- Page content injected here -->
         </div>
     </div>
 

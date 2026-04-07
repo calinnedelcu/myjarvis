@@ -84,10 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Only load when brain tab is clicked
-    document.querySelector('.nav-item[data-target="page-brain"]').addEventListener('click', () => {
-        loadBrainStats();
-        loadCharts();
-        loadVoiceHistory();
+    // Load when brain page is expanded
+    window.addEventListener('page-expanded', (e) => {
+        if (e.detail.pageId === 'page-brain') {
+            loadBrainStats();
+            loadCharts();
+            loadVoiceHistory();
+        }
     });
 });

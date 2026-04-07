@@ -64,5 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await window.apiFetch('/api/briefing/audio', { method: "POST" });
     });
 
-    document.querySelector('.nav-item[data-target="page-briefing"]').addEventListener('click', loadBriefing);
+    window.addEventListener('page-expanded', (e) => {
+        if (e.detail.pageId === 'page-briefing') loadBriefing();
+    });
 });

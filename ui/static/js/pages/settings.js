@@ -49,8 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loadStatus();
     });
 
-    document.querySelector('.nav-item[data-target="page-settings"]').addEventListener('click', () => {
-        loadStatus();
-        loadSettings();
+    window.addEventListener('page-expanded', (e) => {
+        if (e.detail.pageId === 'page-settings') {
+            loadStatus();
+            loadSettings();
+        }
     });
 });
