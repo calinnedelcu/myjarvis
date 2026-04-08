@@ -1,16 +1,9 @@
-"""Claude Code integration — headless CLI + real-time dashboard streaming."""
+"""Claude Code integration — uses shared persistent process + real-time dashboard streaming."""
 
-import json
-import re
-import subprocess
-from datetime import datetime
-from pathlib import Path
 from loguru import logger
 
-_DEFAULT_DIR = r"C:\Projects\jarvis"
-_TIMEOUT = 120
 _SHORT_LIMIT = 400
-_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07')
+_last_response = {"prompt": "", "summary": "", "full": ""}
 
 
 def _push(msg_type: str, content, *, raw_msg: dict = None):
@@ -28,84 +21,37 @@ def _push(msg_type: str, content, *, raw_msg: dict = None):
 
 
 def run_claude_code(prompt: str, directory: str = "") -> str:
-    """Run Claude Code with --continue for context, stream to dashboard in real-time."""
-    cwd = directory or _DEFAULT_DIR
+    """Run Claude Code via shared persistent process, stream to dashboard in real-time."""
     try:
+        from ui.claude_session import get_claude
+        from ui.dashboard import _handle_claude_event
+
         logger.info(f"Claude Code: {prompt[:100]}")
         _push("user", prompt)
-
         _push("claude_working", "true")
 
-        cmd = ["claude", "-p", prompt]
-        try:
-            from ui.dashboard import should_skip_continue
-            if not should_skip_continue():
-                cmd.append("--continue")
-        except ImportError:
-            cmd.append("--continue")
-        cmd += ["--output-format", "stream-json", "--verbose",
-                "--include-partial-messages",
-                "--dangerously-skip-permissions"]
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, cwd=cwd,
-        )
-
         output_parts = []
-        while True:
-            line = proc.stdout.readline()
-            if not line:
-                break
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                clean = _ANSI_RE.sub('', line)
-                output_parts.append(clean + "\n")
-                _push("claude_stream", clean + "\n")
-                continue
 
-            evt_type = event.get("type")
-            if evt_type == "stream_event":
-                inner = event.get("event", {})
-                if inner.get("type") == "content_block_delta":
-                    delta = inner.get("delta", {})
-                    if delta.get("type") == "text_delta":
-                        text = delta.get("text", "")
-                        if text:
-                            output_parts.append(text)
-                            _push("claude_stream", text)
-            elif evt_type == "rate_limit_event":
-                info = event.get("rate_limit_info", {})
-                if info:
-                    try:
-                        import ui.dashboard as _dash
-                        _dash._rate_limit_info = info
-                    except Exception:
-                        pass
-                    _push("rate_limit", "", raw_msg={"type": "rate_limit", "info": info})
-            elif evt_type == "result":
-                if not output_parts and event.get("result"):
-                    output_parts.append(event["result"])
-                    _push("claude_stream", event["result"])
+        def on_event(event):
+            _handle_claude_event(event, output_parts)
 
-        proc.wait(timeout=_TIMEOUT)
+        claude = get_claude()
+        completed = claude.send(prompt, on_event=on_event, timeout=120)
+
         output = "".join(output_parts).strip()
-        stderr = (proc.stderr.read() or "").strip()
         _push("claude_working", "false")
 
-        if proc.returncode != 0 and not output:
-            error = f"Claude Code hit an error: {stderr[:200]}"
-            logger.error(error)
+        if not completed and not output:
+            error = "Claude Code timed out."
             _push("error", error)
             return error
 
         if not output:
             _push("assistant", "Claude Code finished but produced no output.")
             _push("claude_done", "")
+            _last_response["prompt"] = prompt
+            _last_response["summary"] = "Finished but produced no output."
+            _last_response["full"] = ""
             return "Claude Code finished but produced no output."
 
         lines = output.count("\n") + 1
@@ -113,6 +59,21 @@ def run_claude_code(prompt: str, directory: str = "") -> str:
 
         _push("assistant", output)
         _push("claude_done", output)
+
+        # Store last response so Jarvis brain can reference it
+        _last_response["prompt"] = prompt
+        _last_response["full"] = output
+        if len(output) <= _SHORT_LIMIT:
+            _last_response["summary"] = output
+        else:
+            # Build a meaningful summary from first and last few lines
+            out_lines = output.strip().split("\n")
+            head = "\n".join(out_lines[:5])
+            tail = "\n".join(out_lines[-3:]) if len(out_lines) > 8 else ""
+            _last_response["summary"] = (
+                f"{head}\n{'...\n' + tail if tail else ''}"
+                f"\n[{lines} lines total]"
+            )
 
         if len(output) <= _SHORT_LIMIT:
             return output
@@ -124,9 +85,6 @@ def run_claude_code(prompt: str, directory: str = "") -> str:
             f"Full response visible on the dashboard."
         )
 
-    except subprocess.TimeoutExpired:
-        _push("error", f"Timed out after {_TIMEOUT}s")
-        return f"Claude Code timed out after {_TIMEOUT} seconds."
     except FileNotFoundError:
         return "Claude Code CLI is not installed or not on PATH."
     except Exception as exc:
@@ -135,7 +93,31 @@ def run_claude_code(prompt: str, directory: str = "") -> str:
         return f"Error running Claude Code: {exc}"
 
 
+def get_last_claude_response() -> str:
+    """Return Claude Code's last response summary for Jarvis to read back."""
+    if not _last_response["summary"]:
+        return "Claude Code hasn't responded to anything yet in this session."
+    return (
+        f"Last prompt sent to Claude: {_last_response['prompt'][:200]}\n\n"
+        f"Claude's response:\n{_last_response['summary']}"
+    )
+
+
 TOOLS = [
+    {
+        "name": "get_last_claude_response",
+        "description": (
+            "Get Claude Code's last response/answer. Use when the user asks "
+            "'what did Claude say?', 'what was Claude's response?', "
+            "'what did Claude do?', 'read Claude's answer', 'tell me what Claude replied', "
+            "or any question about Claude Code's most recent output."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
     {
         "name": "run_claude_code",
         "description": (
@@ -143,8 +125,10 @@ TOOLS = [
             "Use when the user says 'tell Claude to...', 'ask Claude Code to...', "
             "'use Claude to fix/build/write/refactor...', etc. "
             "Claude Code can read/write files, run commands, and make code changes. "
-            "Uses --continue to maintain conversation context across calls. "
-            "Results stream live on the dashboard terminal and Jarvis speaks a summary."
+            "Results stream live on the dashboard terminal and Jarvis speaks a summary. "
+            "IMPORTANT: The prompt must be plain natural language, NOT code. "
+            "Do NOT wrap it in print(), code blocks, or any programming syntax. "
+            "Example: if the user says 'tell Claude hello', the prompt is 'hello', NOT 'print(\"hello\")'."
         ),
         "input_schema": {
             "type": "object",
@@ -165,4 +149,5 @@ TOOLS = [
 
 HANDLERS = {
     "run_claude_code": run_claude_code,
+    "get_last_claude_response": lambda: get_last_claude_response(),
 }

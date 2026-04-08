@@ -364,6 +364,58 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('tele-gpu').textContent = Math.round(gpu) + '%';
     }
 
+    // ── Claude session usage ──
+    async function pollClaudeUsage() {
+        const stats = await window.apiFetch('/api/session-stats');
+        if (!stats) return;
+
+        const pctEl = document.getElementById('claude-usage-pct');
+        const modelEl = document.getElementById('claude-usage-model');
+        const resetEl = document.getElementById('claude-reset-timer');
+        const barEl = document.getElementById('claude-usage-bar');
+        const costEl = document.getElementById('claude-cost-line');
+        if (!pctEl) return;
+
+        // Model name (shorten)
+        const model = stats.model || '--';
+        const shortModel = model.replace('claude-', '').replace(/-/g, ' ');
+        modelEl.textContent = shortModel;
+
+        // Cost
+        const cost = stats.total_cost_usd || 0;
+        costEl.textContent = '$' + cost.toFixed(2);
+
+        // Rate limit info
+        const rl = stats.rate_limit || {};
+        const resetTs = rl.five_hour_reset || rl.resetsAt;
+        if (resetTs) {
+            const resetDate = new Date(resetTs * 1000);
+            const now = new Date();
+            const diffMin = Math.max(0, Math.round((resetDate - now) / 60000));
+            const h = Math.floor(diffMin / 60), m = diffMin % 60;
+            resetEl.textContent = 'Resets ' + (h > 0 ? h + 'h ' : '') + m + 'm';
+        } else {
+            resetEl.textContent = '--';
+        }
+
+        // Plan usage percentage from Anthropic API utilization headers
+        const utilization = rl.five_hour_utilization;
+        const usagePct = utilization != null ? Math.round(utilization * 100) : null;
+
+        if (usagePct != null) {
+            pctEl.textContent = usagePct + '%';
+        } else {
+            pctEl.textContent = '--%';
+        }
+
+        // Bar matches the percentage
+        const barPct = usagePct != null ? usagePct : 0;
+        barEl.style.width = Math.max(2, barPct) + '%';
+        barEl.classList.remove('warn', 'critical');
+        if (barPct > 70) barEl.classList.add('warn');
+        if (barPct > 90) barEl.classList.add('critical');
+    }
+
     // ── Quick actions ──
     document.querySelectorAll('.radial-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -399,10 +451,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Initialize ──
     loadHomeData();
     pollSystem();
+    pollClaudeUsage();
     updateTimeMarker();
 
     // Refresh intervals
     setInterval(pollSystem, 5000);
+    setInterval(pollClaudeUsage, 15000);
     setInterval(updateTimeMarker, 30000);
     setInterval(loadHomeData, 60000);
 });

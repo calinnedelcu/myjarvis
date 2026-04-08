@@ -1,9 +1,14 @@
 """
 Phase 9 — Web Dashboard + Claude Code Terminal
 FastAPI backend serving dashboard data + WebSocket for Claude terminal.
+
+Token-efficient architecture: uses a single persistent Claude Code subprocess
+(via --input-format stream-json) instead of spawning a new process per message.
+System prompt loaded once, prompt caching optimal across all turns.
 """
 
 import asyncio
+import http.client
 import json
 import re
 import subprocess
@@ -29,16 +34,65 @@ _PROJECT = Path(__file__).resolve().parent.parent
 _config: dict = {}
 _claude_history: list[dict] = []  # shared conversation log
 _rate_limit_info: dict = {}  # cached Claude session usage limits
-_skip_continue: bool = False  # when True, next claude call omits --continue (fresh conversation)
 
 
-def should_skip_continue() -> bool:
-    """Check and reset the skip-continue flag. Returns True once after /clear."""
-    global _skip_continue
-    if _skip_continue:
-        _skip_continue = False
-        return True
-    return False
+def _fetch_rate_limit_utilization() -> dict | None:
+    """Query Anthropic API to get real plan usage utilization from response headers."""
+    try:
+        creds_path = Path.home() / ".claude" / ".credentials.json"
+        if not creds_path.exists():
+            return None
+        creds = json.loads(creds_path.read_text())
+        token = creds.get("claudeAiOauth", {}).get("accessToken")
+        if not token:
+            return None
+
+        conn = http.client.HTTPSConnection("api.anthropic.com", timeout=10)
+        body = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "hi"}],
+        })
+        conn.request("POST", "/v1/messages", body, {
+            "Content-Type": "application/json",
+            "x-api-key": token,
+            "anthropic-version": "2023-06-01",
+        })
+        resp = conn.getresponse()
+        resp.read()  # drain body
+        if resp.status != 200:
+            conn.close()
+            return None
+
+        headers = {k.lower(): v for k, v in resp.getheaders()}
+        conn.close()
+
+        result = {}
+        for key, field in [
+            ("anthropic-ratelimit-unified-5h-utilization", "five_hour_utilization"),
+            ("anthropic-ratelimit-unified-7d-utilization", "seven_day_utilization"),
+            ("anthropic-ratelimit-unified-5h-reset", "five_hour_reset"),
+            ("anthropic-ratelimit-unified-7d-reset", "seven_day_reset"),
+        ]:
+            if key in headers:
+                result[field] = float(headers[key])
+        return result if result else None
+    except Exception as exc:
+        logger.debug("Rate limit utilization fetch failed: {}", exc)
+        return None
+_session_stats: dict = {  # accumulated session usage stats
+    "model": "",
+    "claude_code_version": "",
+    "session_id": "",
+    "total_cost_usd": 0.0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "total_cache_read_tokens": 0,
+    "total_cache_creation_tokens": 0,
+    "num_messages": 0,
+    "context_messages": 0,
+    "fast_mode": "off",
+}
 
 from ui.routes import brain, briefing, projects, ide, settings
 from ui.db_managers import voice_db
@@ -55,8 +109,18 @@ app.include_router(settings.router)
 
 
 def init_dashboard(config: dict) -> None:
-    global _config
+    global _config, _rate_limit_info
     _config = config
+    # Fetch plan usage utilization at startup so the home page island has data immediately
+    def _initial_fetch():
+        global _rate_limit_info
+        util = _fetch_rate_limit_utilization()
+        if util:
+            _rate_limit_info.update(util)
+            logger.info("Plan usage: 5h={:.0f}%, 7d={:.0f}%",
+                        util.get("five_hour_utilization", 0) * 100,
+                        util.get("seven_day_utilization", 0) * 100)
+    threading.Thread(target=_initial_fetch, daemon=True).start()
 
 
 # ── Dashboard data endpoints ─────────────────────────────────────
@@ -183,6 +247,12 @@ async def claude_limit():
     return _rate_limit_info
 
 
+@app.get("/api/session-stats")
+async def session_stats():
+    """Return accumulated session usage stats."""
+    return {**_session_stats, "rate_limit": _rate_limit_info}
+
+
 
 
 # ── Claude Code WebSocket terminal ───────────────────────────────
@@ -226,165 +296,130 @@ def broadcast_to_clients(msg: dict):
         pass
 
 
-def _run_claude_streaming(prompt: str):
-    """Run claude -p in a subprocess and stream output to WebSocket clients."""
-    global _rate_limit_info
-    _add_to_history("user", prompt)
+def _handle_claude_event(event: dict, full_text_parts: list):
+    """Process a single streaming event from the persistent Claude process."""
+    global _rate_limit_info, _session_stats
+    evt_type = event.get("type")
 
+    if evt_type == "raw_text":
+        text = event.get("content", "")
+        broadcast_to_clients({"type": "claude_stream", "content": text + "\n"})
+        full_text_parts.append(text + "\n")
+
+    elif evt_type == "system" and event.get("subtype") == "init":
+        _session_stats["model"] = event.get("model", "")
+        _session_stats["claude_code_version"] = event.get("claude_code_version", "")
+        _session_stats["session_id"] = event.get("session_id", "")
+        _session_stats["fast_mode"] = event.get("fast_mode_state", "off")
+        broadcast_to_clients({"type": "session_info", "stats": _session_stats})
+
+    elif evt_type == "stream_event":
+        inner = event.get("event", {})
+        inner_type = inner.get("type", "")
+
+        if inner_type == "content_block_delta":
+            delta = inner.get("delta", {})
+            if delta.get("type") == "text_delta":
+                text = delta.get("text", "")
+                if text:
+                    broadcast_to_clients({"type": "claude_stream", "content": text})
+                    full_text_parts.append(text)
+
+        elif inner_type == "content_block_start":
+            cb = inner.get("content_block", {})
+            if cb.get("type") == "tool_use":
+                tool_name = cb.get("name", "unknown")
+                tool_msg = f"\n🔧 **{tool_name}**\n"
+                broadcast_to_clients({"type": "claude_stream", "content": tool_msg})
+                full_text_parts.append(tool_msg)
+
+    elif evt_type == "tool_use_event":
+        tool_result = event.get("tool_result", "")
+        if tool_result:
+            result_preview = str(tool_result)[:300]
+            result_msg = f"```\n{result_preview}\n```\n"
+            broadcast_to_clients({"type": "claude_stream", "content": result_msg})
+            full_text_parts.append(result_msg)
+
+    elif evt_type == "rate_limit_event":
+        info = event.get("rate_limit_info", {})
+        if info:
+            # Enrich with real utilization from API headers (background)
+            def _enrich_rate_limit():
+                global _rate_limit_info
+                util = _fetch_rate_limit_utilization()
+                if util:
+                    _rate_limit_info.update(util)
+                    broadcast_to_clients({"type": "rate_limit", "info": _rate_limit_info})
+            _rate_limit_info = info
+            broadcast_to_clients({"type": "rate_limit", "info": info})
+            threading.Thread(target=_enrich_rate_limit, daemon=True).start()
+
+    elif evt_type == "result":
+        if not full_text_parts and event.get("result"):
+            full_text_parts.append(event["result"])
+            broadcast_to_clients({"type": "claude_stream", "content": event["result"]})
+
+        cost = event.get("total_cost_usd", 0)
+        usage = event.get("usage", {})
+        _session_stats["total_cost_usd"] += cost
+        _session_stats["total_input_tokens"] += usage.get("input_tokens", 0)
+        _session_stats["total_output_tokens"] += usage.get("output_tokens", 0)
+        _session_stats["total_cache_read_tokens"] += usage.get("cache_read_input_tokens", 0)
+        _session_stats["total_cache_creation_tokens"] += usage.get("cache_creation_input_tokens", 0)
+        _session_stats["num_messages"] += 1
+        _session_stats["fast_mode"] = event.get("fast_mode_state", _session_stats.get("fast_mode", "off"))
+        model_usage = event.get("modelUsage", {})
+        if model_usage:
+            _session_stats["model_usage"] = model_usage
+        broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
+
+
+def _run_claude_streaming(prompt: str, image_data: str = None):
+    """Send prompt to the persistent Claude process and stream to WebSocket clients."""
+    from ui.claude_session import get_claude
+
+    _add_to_history("user", prompt)
     broadcast_to_clients({"type": "user", "content": prompt})
     broadcast_to_clients({"type": "claude_working", "content": "true"})
 
+    full_text_parts = []
+
+    def on_event(event):
+        _handle_claude_event(event, full_text_parts)
+
     try:
-        global _claude_proc
-        cmd = ["claude", "-p", prompt]
-        if not should_skip_continue():
-            cmd.append("--continue")
-        cmd += ["--output-format", "stream-json", "--verbose",
-                "--include-partial-messages",
-                "--dangerously-skip-permissions"]
-        env = {**__import__('os').environ, "PYTHONIOENCODING": "utf-8"}
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace",
-            cwd=str(_PROJECT), env=env,
-        )
-        _claude_proc = proc
+        claude = get_claude()
 
-        full_text_parts = []
-        while True:
-            line = proc.stdout.readline()
-            if not line:
-                break
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                # Non-JSON line — forward as text
-                clean = _strip_ansi(line)
-                broadcast_to_clients({"type": "claude_stream", "content": clean + "\n"})
-                full_text_parts.append(clean + "\n")
-                continue
+        if image_data:
+            # Strip data URL prefix if present
+            raw = image_data.split(",", 1)[1] if "," in image_data else image_data
+            completed = claude.send_with_image(
+                prompt, raw, on_event=on_event, timeout=300,
+            )
+        else:
+            completed = claude.send(prompt, on_event=on_event, timeout=300)
 
-            evt_type = event.get("type")
-
-            if evt_type == "stream_event":
-                inner = event.get("event", {})
-                inner_type = inner.get("type", "")
-
-                # Text streaming
-                if inner_type == "content_block_delta":
-                    delta = inner.get("delta", {})
-                    if delta.get("type") == "text_delta":
-                        text = delta.get("text", "")
-                        if text:
-                            broadcast_to_clients({"type": "claude_stream", "content": text})
-                            full_text_parts.append(text)
-
-                # Tool use — show what Claude is doing
-                elif inner_type == "content_block_start":
-                    cb = inner.get("content_block", {})
-                    if cb.get("type") == "tool_use":
-                        tool_name = cb.get("name", "unknown")
-                        tool_msg = f"\n🔧 **{tool_name}**\n"
-                        broadcast_to_clients({"type": "claude_stream", "content": tool_msg})
-                        full_text_parts.append(tool_msg)
-
-                # Tool input streaming (shows what Claude is passing to the tool)
-                elif inner_type == "content_block_delta":
-                    delta = inner.get("delta", {})
-                    if delta.get("type") == "input_json_delta":
-                        pass  # skip raw JSON input — too noisy
-
-            elif evt_type == "tool_use_event":
-                # Tool execution result
-                tool_name = event.get("tool_name", "")
-                tool_result = event.get("tool_result", "")
-                if tool_result:
-                    result_preview = str(tool_result)[:300]
-                    result_msg = f"```\n{result_preview}\n```\n"
-                    broadcast_to_clients({"type": "claude_stream", "content": result_msg})
-                    full_text_parts.append(result_msg)
-
-            elif evt_type == "rate_limit_event":
-                info = event.get("rate_limit_info", {})
-                if info:
-                    _rate_limit_info = info
-                    broadcast_to_clients({"type": "rate_limit", "info": info})
-
-            elif evt_type == "result":
-                # Final result — use its text if we missed streaming
-                if not full_text_parts and event.get("result"):
-                    full_text_parts.append(event["result"])
-                    broadcast_to_clients({"type": "claude_stream", "content": event["result"]})
-
-        proc.wait()
         full_output = "".join(full_text_parts).strip()
         broadcast_to_clients({"type": "claude_working", "content": "false"})
-
         _add_to_history("assistant", full_output)
+        _session_stats["context_messages"] = len(_claude_history)
+        broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
         broadcast_to_clients({"type": "claude_done", "content": full_output})
+
+        if not completed:
+            broadcast_to_clients({"type": "claude_error", "content": "Response timed out."})
 
     except Exception as exc:
         error_msg = f"Error: {exc}"
         broadcast_to_clients({"type": "claude_working", "content": "false"})
         broadcast_to_clients({"type": "claude_error", "content": error_msg})
         _add_to_history("error", error_msg)
+        _session_stats["context_messages"] = len(_claude_history)
+        broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
 
 
 _main_loop: asyncio.AbstractEventLoop = None
-_claude_proc: subprocess.Popen = None  # track running claude process
-
-
-def _probe_claude_usage():
-    """Run a minimal Claude CLI command to get current rate limit info."""
-    global _rate_limit_info
-    try:
-        env = {**__import__('os').environ, "PYTHONIOENCODING": "utf-8"}
-        proc = subprocess.Popen(
-            ["claude", "-p", "hi", "--output-format", "stream-json",
-             "--verbose", "--no-session-persistence",
-             "--dangerously-skip-permissions"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace",
-            cwd=str(_PROJECT), env=env,
-        )
-        import time as _t
-        deadline = _t.time() + 30
-        for line in proc.stdout:
-            if _t.time() > deadline:
-                break
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") == "rate_limit_event":
-                info = event.get("rate_limit_info", {})
-                if info:
-                    _rate_limit_info = info
-                    broadcast_to_clients({"type": "rate_limit", "info": info})
-                    break
-        try:
-            proc.kill()
-        except Exception:
-            pass
-        proc.wait(timeout=5)
-    except Exception as e:
-        logger.debug(f"Claude usage probe failed: {e}")
-
-
-def _usage_poll_loop():
-    """Background loop to periodically probe Claude rate limits."""
-    import time
-    time.sleep(10)  # Wait for server to be ready
-    while True:
-        _probe_claude_usage()
-        time.sleep(300)  # Every 5 minutes
 
 
 @app.websocket("/ws/claude")
@@ -397,41 +432,57 @@ async def claude_terminal(ws: WebSocket):
         {"role": m["role"], "content": m["content"], "time": m.get("time", "")}
         for m in _claude_history
     ]})
+    # Send current session stats and rate limit info
+    await ws.send_json({"type": "session_info", "stats": _session_stats})
+    await ws.send_json({"type": "session_stats", "stats": _session_stats})
+    if _rate_limit_info:
+        await ws.send_json({"type": "rate_limit", "info": _rate_limit_info})
 
     try:
         while True:
             data = await ws.receive_text()
             msg = json.loads(data)
             if msg.get("type") == "stop":
-                if _claude_proc and _claude_proc.poll() is None:
-                    _claude_proc.kill()
-                    broadcast_to_clients({"type": "claude_working", "content": "false"})
-                    broadcast_to_clients({"type": "claude_error", "content": "Task cancelled."})
+                from ui.claude_session import get_claude
+                get_claude().stop()
+                broadcast_to_clients({"type": "claude_working", "content": "false"})
+                broadcast_to_clients({"type": "claude_error", "content": "Task cancelled."})
             elif msg.get("type") == "command":
                 cmd = msg.get("name", "")
                 if cmd == "clear":
-                    global _skip_continue
+                    from ui.claude_session import get_claude
+                    get_claude().clear()
                     _claude_history.clear()
                     _history_ids.clear()
-                    _skip_continue = True
+                    # Reset session stats for new conversation
+                    _session_stats["total_cost_usd"] = 0.0
+                    _session_stats["total_input_tokens"] = 0
+                    _session_stats["total_output_tokens"] = 0
+                    _session_stats["total_cache_read_tokens"] = 0
+                    _session_stats["total_cache_creation_tokens"] = 0
+                    _session_stats["num_messages"] = 0
+                    _session_stats["context_messages"] = 0
+                    _session_stats.pop("model_usage", None)
                     broadcast_to_clients({"type": "cleared"})
+                    broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
+                elif cmd == "set_model":
+                    from ui.claude_session import get_claude
+                    new_model = msg.get("value", "").strip()
+                    if new_model:
+                        get_claude().set_model(new_model)
+                        _session_stats["model"] = new_model
+                        await ws.send_json({"type": "session_info", "stats": _session_stats})
+                        broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
+                elif cmd == "get_stats":
+                    await ws.send_json({"type": "session_stats", "stats": _session_stats})
+                    if _rate_limit_info:
+                        await ws.send_json({"type": "rate_limit", "info": _rate_limit_info})
             elif msg.get("type") == "prompt":
                 prompt = msg["content"]
-                # Handle pasted screenshot
-                if msg.get("image"):
-                    import base64
-                    img_data = msg["image"].split(",", 1)[1]
-                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    img_path = _PROJECT / "data" / "screenshots" / f"clipboard_{ts}.png"
-                    img_path.parent.mkdir(parents=True, exist_ok=True)
-                    img_path.write_bytes(base64.b64decode(img_data))
-                    prompt = (
-                        f"{prompt}\n\n"
-                        f"[User pasted a screenshot saved at: {img_path}]"
-                    )
+                image = msg.get("image")
                 threading.Thread(
                     target=_run_claude_streaming,
-                    args=(prompt,),
+                    args=(prompt, image),
                     daemon=True,
                 ).start()
     except WebSocketDisconnect:
@@ -468,8 +519,6 @@ def start_dashboard(config: dict, port: int = 9000):
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    # Start Claude usage polling (seeds rate limit info on startup)
-    threading.Thread(target=_usage_poll_loop, daemon=True, name="claude-usage-poll").start()
     # Wait briefly to confirm server actually starts
     import time
     time.sleep(1)

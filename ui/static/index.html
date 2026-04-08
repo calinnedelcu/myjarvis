@@ -40,12 +40,6 @@
                 <div class="hud-particles" id="hud-particles"></div>
                 <div class="hud-scanline"></div>
 
-                <!-- Corner brackets -->
-                <div class="hud-corner tl"></div>
-                <div class="hud-corner tr"></div>
-                <div class="hud-corner bl"></div>
-                <div class="hud-corner br"></div>
-
                 <!-- Center Arc Reactor — Breathing Brain Core -->
                 <div class="arc-reactor-container">
                     <!-- Ambient glow aura behind reactor -->
@@ -163,11 +157,11 @@
 
                 <!-- Navigation Nodes (hexagonal around reactor) -->
                 <div class="nav-nodes-container" id="nav-nodes-container">
-                    <div class="nav-node active" id="node-home-data" data-page="home-data" style="top: 18%; left: 50%;">
+                    <div class="nav-node" id="node-voice-log" data-page="page-voice-log" style="top: 18%; left: 50%;">
                         <div class="nav-node-circle">
-                            <span class="nav-node-icon">⊞</span>
+                            <span class="nav-node-icon">🎙</span>
                         </div>
-                        <span class="nav-node-label">HOME DATA</span>
+                        <span class="nav-node-label">VOICE LOG</span>
                     </div>
                     <div class="nav-node" id="node-brain" data-page="page-brain" style="top: 30%; left: 75%;">
                         <div class="nav-node-circle">
@@ -250,6 +244,23 @@
                     <div class="island-label">MEDIA</div>
                 </div>
 
+                <div class="data-island" id="island-claude" data-color="cyan">
+                    <div class="island-ring"></div>
+                    <div class="island-content">
+                        <div class="island-icon" style="font-size:1rem;">_&gt;</div>
+                        <div class="island-value" id="claude-usage-pct">0%</div>
+                        <div class="island-detail" id="claude-usage-model">Claude</div>
+                        <div class="island-extra" id="claude-usage-extra">
+                            <div id="claude-reset-timer">--</div>
+                            <div class="claude-usage-bar-wrap">
+                                <div class="claude-usage-bar" id="claude-usage-bar"></div>
+                            </div>
+                            <div id="claude-cost-line">$0.00</div>
+                        </div>
+                    </div>
+                    <div class="island-label">CLAUDE SESSION</div>
+                </div>
+
                 <div class="data-island island-sm" id="island-lights" data-color="amber">
                     <div class="island-ring"></div>
                     <div class="island-content">
@@ -293,29 +304,20 @@
                     <div class="island-label">TELEMETRY</div>
                 </div>
 
-                <!-- Bottom ticker -->
-                <div class="hud-ticker">
-                    <div class="ticker-content" id="ticker-content">
-                        JARVIS SYSTEMS ONLINE ── INITIALIZING DATA FEEDS...
-                    </div>
-                </div>
-
-                <!-- Radial quick actions (bottom center) -->
-                <div class="radial-actions" id="radial-actions">
-                    <button class="radial-btn" data-action="lights off" title="Lights Off">
-                        <span class="radial-icon">💡</span>
-                    </button>
-                    <button class="radial-btn" data-action="play music" title="Play Music">
-                        <span class="radial-icon">🎵</span>
-                    </button>
-                    <button class="radial-btn" data-action="read emails" title="Read Emails">
-                        <span class="radial-icon">📧</span>
-                    </button>
-                    <button class="radial-btn" data-action="lock pc" title="Lock PC">
-                        <span class="radial-icon">🔒</span>
-                    </button>
-                </div>
         </section>
+
+        <!-- Corner brackets (fixed, outside page-home) -->
+        <div class="hud-corner tl"></div>
+        <div class="hud-corner tr"></div>
+        <div class="hud-corner bl"></div>
+        <div class="hud-corner br"></div>
+
+        <!-- Bottom ticker (outside page-home so it stays fixed during pan) -->
+        <div class="hud-ticker">
+            <div class="ticker-content" id="ticker-content">
+                JARVIS SYSTEMS ONLINE ── INITIALIZING DATA FEEDS...
+            </div>
+        </div>
 
         <!-- Pages Container (hidden — pages are moved into expanded-panel on demand) -->
         <div class="pages-container">
@@ -444,6 +446,37 @@
                             <button class="sm-btn" id="term-toggle">RAW/MD</button>
                         </div>
                     </div>
+                    <!-- Session Stats Bar -->
+                    <div class="session-stats-bar" id="session-stats-bar">
+                        <div class="stat-item" title="Active model">
+                            <span class="stat-icon">◎</span>
+                            <span id="stat-model">--</span>
+                        </div>
+                        <div class="stat-item" title="Total cost this session">
+                            <span class="stat-icon">$</span>
+                            <span id="stat-cost">0.00</span>
+                        </div>
+                        <div class="stat-item" title="Input tokens (cache read / cache write)">
+                            <span class="stat-icon">↓</span>
+                            <span id="stat-input-tokens">0</span>
+                        </div>
+                        <div class="stat-item" title="Output tokens">
+                            <span class="stat-icon">↑</span>
+                            <span id="stat-output-tokens">0</span>
+                        </div>
+                        <div class="stat-item" title="Messages sent">
+                            <span class="stat-icon">✦</span>
+                            <span id="stat-messages">0 msgs</span>
+                        </div>
+                        <div class="stat-item" id="stat-context-item" title="Messages in context window — clear when this gets large">
+                            <span class="stat-icon">⊞</span>
+                            <span id="stat-context">0 ctx</span>
+                        </div>
+                        <div class="stat-item stat-rate-limit" id="stat-rate-limit" title="Rate limit status">
+                            <span class="rate-dot ok" id="rate-dot"></span>
+                            <span id="stat-rate-text">--</span>
+                        </div>
+                    </div>
                     <div class="terminal-output" id="terminal-output"></div>
                     <div class="image-preview" id="image-preview">
                         <img id="preview-thumb" src="" alt="screenshot">
@@ -492,6 +525,26 @@
                     </div>
                 </div>
             </section>
+
+            <!-- VOICE LOG PAGE -->
+            <section id="page-voice-log" class="page">
+                <div class="stats-layer">
+                    <div class="stat-card">
+                        <div class="stat-value" id="vlog-count">0</div>
+                        <div class="stat-label">INTERACTIONS TODAY</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="vlog-last-time">--</div>
+                        <div class="stat-label">LAST INTERACTION</div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 1rem; max-height: 60vh; overflow-y: auto;">
+                    <h3>CONVERSATION FEED</h3>
+                    <div id="vlog-feed" class="vlog-feed">
+                        <div style="color: var(--text-muted); padding: 2rem; text-align: center;">Loading voice log...</div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 
@@ -532,5 +585,6 @@
     <script src="/static/js/pages/projects.js"></script>
     <script src="/static/js/pages/ide.js"></script>
     <script src="/static/js/pages/settings.js"></script>
+    <script src="/static/js/pages/voice-log.js"></script>
 </body>
 </html>

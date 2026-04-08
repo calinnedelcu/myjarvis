@@ -78,6 +78,62 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Session stats state ---
+    let sessionStats = { model: '', total_cost_usd: 0, total_input_tokens: 0, total_output_tokens: 0, total_cache_read_tokens: 0, total_cache_creation_tokens: 0, num_messages: 0, context_messages: 0, fast_mode: 'off' };
+    let rateLimitInfo = {};
+
+    function formatTokens(n) {
+        if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+        if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+        return String(n);
+    }
+
+    function updateStatsBar() {
+        const s = sessionStats;
+        const modelEl = document.getElementById('stat-model');
+        const costEl = document.getElementById('stat-cost');
+        const inputEl = document.getElementById('stat-input-tokens');
+        const outputEl = document.getElementById('stat-output-tokens');
+        const msgsEl = document.getElementById('stat-messages');
+
+        modelEl.textContent = s.model || '--';
+        costEl.textContent = s.total_cost_usd.toFixed(4);
+        // Show input tokens with cache breakdown
+        const cacheRead = s.total_cache_read_tokens || 0;
+        const cacheWrite = s.total_cache_creation_tokens || 0;
+        const rawInput = s.total_input_tokens || 0;
+        let inputText = formatTokens(rawInput + cacheRead + cacheWrite);
+        if (cacheRead > 0 || cacheWrite > 0) {
+            inputText += ` (${formatTokens(cacheRead)}r/${formatTokens(cacheWrite)}w)`;
+        }
+        inputEl.textContent = inputText;
+        outputEl.textContent = formatTokens(s.total_output_tokens || 0);
+        msgsEl.textContent = s.num_messages + ' msgs';
+
+        const ctxEl = document.getElementById('stat-context');
+        const ctxCount = s.context_messages || 0;
+        ctxEl.textContent = ctxCount + ' ctx';
+        ctxEl.className = ctxCount >= 60 ? 'ctx-danger' : ctxCount >= 30 ? 'ctx-warn' : '';
+
+        // Rate limit
+        const rateDot = document.getElementById('rate-dot');
+        const rateText = document.getElementById('stat-rate-text');
+        if (rateLimitInfo.status) {
+            const status = rateLimitInfo.status;
+            rateDot.className = 'rate-dot ' + (status === 'allowed' ? 'ok' : status === 'warning' ? 'warn' : 'blocked');
+            if (rateLimitInfo.resetsAt) {
+                const resetDate = new Date(rateLimitInfo.resetsAt * 1000);
+                const now = new Date();
+                const diffMin = Math.max(0, Math.round((resetDate - now) / 60000));
+                const hours = Math.floor(diffMin / 60);
+                const mins = diffMin % 60;
+                rateText.textContent = status.toUpperCase() + ' | resets ' + (hours > 0 ? hours + 'h ' : '') + mins + 'm';
+            } else {
+                rateText.textContent = status.toUpperCase();
+            }
+        }
+    }
+
     // --- WebSocket Terminal Logic ---
     let ws = null;
     let renderMarkdown = true;
@@ -110,6 +166,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 appendMessage("error", msg.content);
             } else if (msg.type === "cleared") {
                 termOut.innerHTML = '';
+                appendMessage("system", "Session cleared. Next message starts a new conversation.");
+            } else if (msg.type === "session_info" || msg.type === "session_stats") {
+                if (msg.stats) {
+                    sessionStats = { ...sessionStats, ...msg.stats };
+                    updateStatsBar();
+                }
+            } else if (msg.type === "rate_limit") {
+                if (msg.info) {
+                    rateLimitInfo = msg.info;
+                    updateStatsBar();
+                }
             }
         };
 
@@ -158,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             const el = document.createElement('div');
-            el.className = role === "user" ? "user-msg text-amber" : role === "error" ? "user-msg text-red" : "claude-msg";
+            el.className = role === "user" ? "user-msg text-amber" : role === "error" ? "user-msg text-red" : role === "system" ? "system-msg" : "claude-msg";
             if(role === "user") {
                 el.innerHTML = `<b>> ${DOMPurify.sanitize(text)}</b>`;
             } else {
@@ -224,12 +291,95 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Slash command handling ---
+    function handleSlashCommand(cmd) {
+        const parts = cmd.slice(1).split(/\s+/);
+        const name = parts[0].toLowerCase();
+
+        if (name === 'clear') {
+            if (ws) ws.send(JSON.stringify({ type: "command", name: "clear" }));
+            return true;
+        }
+        if (name === 'model') {
+            const arg = parts[1] || '';
+            if (arg) {
+                // Switch model via backend
+                if (ws) ws.send(JSON.stringify({ type: "command", name: "set_model", value: arg }));
+                appendMessage("system", `Switching model to ${arg}...`);
+            } else {
+                const model = sessionStats.model || 'unknown';
+                const version = sessionStats.claude_code_version || '?';
+                const fast = sessionStats.fast_mode === 'on' ? ' (FAST MODE)' : '';
+                appendMessage("system", `Model: ${model}${fast}\nClaude Code: v${version}\n\nUsage: /model <name>  (e.g. /model sonnet, /model opus)`);
+            }
+            return true;
+        }
+        if (name === 'cost' || name === 'usage' || name === 'stats') {
+            const s = sessionStats;
+            const totalIn = (s.total_input_tokens || 0) + (s.total_cache_read_tokens || 0) + (s.total_cache_creation_tokens || 0);
+            const totalAll = totalIn + (s.total_output_tokens || 0);
+            let text = `Session Usage\n`;
+            text += `  Model: ${s.model || '--'}\n`;
+            text += `  Cost: $${s.total_cost_usd.toFixed(4)}\n`;
+            // Plan usage from real Anthropic utilization
+            const fiveHourUtil = rateLimitInfo.five_hour_utilization;
+            if (fiveHourUtil != null) {
+                text += `  Plan usage (5h): ${Math.round(fiveHourUtil * 100)}%\n`;
+            }
+            const sevenDayUtil = rateLimitInfo.seven_day_utilization;
+            if (sevenDayUtil != null) {
+                text += `  Plan usage (7d): ${Math.round(sevenDayUtil * 100)}%\n`;
+            }
+            text += `  Tokens: ${formatTokens(totalAll)} (${formatTokens(totalIn)} in / ${formatTokens(s.total_output_tokens || 0)} out)\n`;
+            text += `  Messages: ${s.num_messages}`;
+            if (s.total_cache_read_tokens || s.total_cache_creation_tokens) {
+                text += `\n  Cache: ${formatTokens(s.total_cache_read_tokens)}r / ${formatTokens(s.total_cache_creation_tokens)}w`;
+            }
+            if (rateLimitInfo.status) {
+                const resetTs = rateLimitInfo.five_hour_reset || rateLimitInfo.resetsAt;
+                text += `\n  Rate limit: ${rateLimitInfo.status}`;
+                if (resetTs) {
+                    const resetDate = new Date(resetTs * 1000);
+                    const now = new Date();
+                    const diffMin = Math.max(0, Math.round((resetDate - now) / 60000));
+                    const h = Math.floor(diffMin / 60), m = diffMin % 60;
+                    text += ` (resets in ${h > 0 ? h + 'h ' : ''}${m}m)`;
+                }
+            }
+            appendMessage("system", text);
+            // Also request fresh stats from server
+            if (ws) ws.send(JSON.stringify({ type: "command", name: "get_stats" }));
+            return true;
+        }
+        if (name === 'help') {
+            appendMessage("system",
+                "Available commands:\n" +
+                "  /clear     — Clear history & start new conversation\n" +
+                "  /model [name] — Show or switch model (e.g. /model sonnet)\n" +
+                "  /cost      — Show session token usage & cost\n" +
+                "  /help      — Show this help\n\n" +
+                "Everything else is sent to Claude as a prompt."
+            );
+            return true;
+        }
+        return false; // not a local command — send to Claude
+    }
+
     // --- Input handling ---
     termIn.addEventListener('keydown', (e) => {
         if(e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             const val = termIn.value.trim();
             if(!val && !pendingImage) return;
+
+            // Intercept slash commands (only when no image attached)
+            if (val.startsWith('/') && !pendingImage) {
+                if (handleSlashCommand(val)) {
+                    termIn.value = "";
+                    return;
+                }
+            }
+
             if(ws && ws.readyState === WebSocket.OPEN) {
                 const payload = { type: "prompt", content: val || "Describe this screenshot." };
 

@@ -473,6 +473,19 @@ class Brain:
             if memory_context:
                 base += f"\n\n{memory_context}"
 
+        # Inject last Claude Code response only when user mentions "claude"
+        if user_text and "claude" in user_text.lower():
+            try:
+                from tools.claude_code import _last_response
+                if _last_response.get("summary"):
+                    base += (
+                        f"\n\n── Last Claude Code interaction ──"
+                        f"\nUser asked Claude: {_last_response['prompt'][:300]}"
+                        f"\nClaude responded: {_last_response['summary'][:800]}"
+                    )
+            except Exception:
+                pass
+
         return base
 
     def clear_history(self) -> None:

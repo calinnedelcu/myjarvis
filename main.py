@@ -5,6 +5,7 @@ Main entry point.  Wires up wake-word → STT → Brain (streaming) → TTS (str
 Phase 8: HUD overlay runs on the main thread via tkinter mainloop.
 """
 
+import ctypes
 import os
 import signal
 import sys
@@ -77,6 +78,12 @@ def _hud_tee(gen: Generator[str, None, None], hud: JarvisHUD) -> Generator[str, 
 # ------------------------------------------------------------------
 
 def main() -> None:
+    # Single-instance guard — prevent duplicate HUDs on startup
+    _mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "JarvisAssistantSingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        print("Jarvis is already running — exiting duplicate instance.")
+        sys.exit(0)
+
     config = load_config()
     setup_logging(config)
 
