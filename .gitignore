@@ -9,6 +9,8 @@ config.yaml
 data/google_token.json
 data/google_calendar_token.json
 data/google_credentials.json
+data/fcm-service-account.json
+data/proactive_state.txt
 
 # Runtime data
 data/logs/

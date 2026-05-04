@@ -8,7 +8,6 @@ Edge-tts: free Microsoft cloud fallback.
 Supports speak_streamed() for real-time pipeline: brain streams text -> TTS streams audio.
 """
 
-import asyncio
 import io
 import queue
 import re
@@ -20,6 +19,8 @@ from typing import Generator
 import numpy as np
 import sounddevice as sd
 from loguru import logger
+
+from core import audio_io
 
 # Flush boundary: sentence-ending punctuation OR comma/colon (speak sooner)
 _SENTENCE_END = re.compile(r"(?<=[.!?;,:])\s+")
@@ -54,8 +55,6 @@ class TextToSpeech:
         self._kokoro_sr: int = 24000
         self._kokoro = None
 
-        # Async event loop for edge-tts
-        self._loop: asyncio.AbstractEventLoop | None = None
 
     # ------------------------------------------------------------------
     # Lazy init
@@ -164,15 +163,10 @@ class TextToSpeech:
 
     def _synth_kokoro(self, text: str) -> np.ndarray | None:
         """Synthesize one text chunk with Kokoro. Returns float32 array or None."""
-        try:
-            samples, _sr = self._kokoro.create(
-                text, voice=self._kokoro_voice, speed=self._kokoro_speed
-            )
-            if samples is not None and len(samples) > 0:
-                return samples
-        except Exception as exc:
-            logger.error(f"Kokoro synth error: {exc}")
-        return None
+        result = audio_io.synthesize_kokoro(
+            self._kokoro, text, self._kokoro_voice, self._kokoro_speed
+        )
+        return result[0] if result else None
 
     # ------------------------------------------------------------------
     # ElevenLabs streaming (cloud)
@@ -235,15 +229,11 @@ class TextToSpeech:
     def _stream_el_sentence(self, text: str, output: sd.RawOutputStream) -> None:
         """Send one sentence to ElevenLabs and play PCM chunks as they arrive."""
         try:
-            audio_iter = self._el_client.text_to_speech.stream(
-                voice_id=self._el_voice_id,
-                text=text,
-                model_id=self._el_model_id,
-                output_format=self._el_fmt,
-            )
-            for chunk in audio_iter:
-                if chunk:
-                    output.write(np.frombuffer(chunk, dtype=np.int16))
+            for chunk in audio_io.stream_elevenlabs_pcm(
+                self._el_client, text, self._el_voice_id,
+                self._el_model_id, self._el_fmt,
+            ):
+                output.write(np.frombuffer(chunk, dtype=np.int16))
         except Exception as exc:
             logger.error(f"ElevenLabs stream error: {exc}")
 
@@ -308,47 +298,65 @@ class TextToSpeech:
     # ------------------------------------------------------------------
     def _speak_elevenlabs(self, text: str) -> None:
         self._ensure_el_client()
-        audio_iter = self._el_client.text_to_speech.stream(
-            voice_id=self._el_voice_id,
-            text=text,
-            model_id=self._el_model_id,
-            output_format=self._el_fmt,
-        )
         with sd.RawOutputStream(
             samplerate=self._el_sample_rate, channels=1, dtype="int16"
         ) as out:
-            for chunk in audio_iter:
-                if chunk:
-                    out.write(np.frombuffer(chunk, dtype=np.int16))
+            for chunk in audio_io.stream_elevenlabs_pcm(
+                self._el_client, text, self._el_voice_id,
+                self._el_model_id, self._el_fmt,
+            ):
+                out.write(np.frombuffer(chunk, dtype=np.int16))
 
     # ------------------------------------------------------------------
     # Edge-TTS (free fallback)
     # ------------------------------------------------------------------
     def _speak_edge(self, text: str, language: str = "en") -> None:
         voice = self._edge_voice_ro if language == "ro" else self._edge_voice_en
+        mp3_bytes = audio_io.synthesize_edge_mp3(
+            text, voice, rate=self._edge_rate, volume=self._edge_volume,
+        )
+        if mp3_bytes:
+            self._play_mp3(mp3_bytes)
 
-        async def _generate() -> bytes:
-            import edge_tts
-            communicate = edge_tts.Communicate(
-                text, voice, rate=self._edge_rate, volume=self._edge_volume
+    # ------------------------------------------------------------------
+    # Mobile API helper — synthesize to WAV bytes for /api/mobile/synthesize
+    # ------------------------------------------------------------------
+    def synthesize_to_wav(self, text: str, language: str = "en") -> bytes:
+        """Render text using the configured engine and return WAV bytes (no playback).
+
+        Used by the mobile HTTP endpoint to ship audio to the phone client.
+        """
+        if not text.strip():
+            return b""
+        engine = self._engine
+        try:
+            if engine == "kokoro":
+                self._ensure_kokoro()
+                result = audio_io.synthesize_kokoro(
+                    self._kokoro, text, self._kokoro_voice, self._kokoro_speed,
+                )
+                if result is None:
+                    return b""
+                samples, sr = result
+                return audio_io.float32_to_wav(samples, sr)
+            if engine == "elevenlabs":
+                self._ensure_el_client()
+                return audio_io.synthesize_elevenlabs_wav(
+                    self._el_client, text, self._el_voice_id,
+                    self._el_model_id, self._el_fmt,
+                )
+            voice = self._edge_voice_ro if language == "ro" else self._edge_voice_en
+            mp3 = audio_io.synthesize_edge_mp3(
+                text, voice, rate=self._edge_rate, volume=self._edge_volume,
             )
-            buf = io.BytesIO()
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    buf.write(chunk["data"])
-            return buf.getvalue()
-
-        mp3_bytes = self._run_async(_generate())
-        self._play_mp3(mp3_bytes)
+            return audio_io.edge_mp3_to_wav(mp3)
+        except Exception as exc:
+            logger.error(f"synthesize_to_wav [{engine}] failed: {exc}")
+            return b""
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _run_async(self, coro):
-        if self._loop is None or self._loop.is_closed():
-            self._loop = asyncio.new_event_loop()
-        return self._loop.run_until_complete(coro)
-
     @staticmethod
     def _play_mp3(mp3_bytes: bytes) -> None:
         import av
