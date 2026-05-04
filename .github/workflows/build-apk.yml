@@ -20,6 +20,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
 
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +36,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.5"
+          flutter-version: "3.32.0"
           cache: true
 
       - name: Generate Android platform folder
@@ -85,6 +87,51 @@ jobs:
 
           p.write_text(src)
           print(src)
+          PY
+
+      - name: Inject google-services.json from secret
+        if: env.GOOGLE_SERVICES_JSON_B64 != ''
+        working-directory: mobile
+        run: |
+          echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json
+          echo "google-services.json injected ($(wc -c < android/app/google-services.json) bytes)"
+
+      - name: Patch Gradle files for Firebase google-services plugin
+        if: env.GOOGLE_SERVICES_JSON_B64 != ''
+        working-directory: mobile
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+
+          settings = pathlib.Path("android/settings.gradle")
+          if not settings.exists():
+              settings = pathlib.Path("android/settings.gradle.kts")
+          src = settings.read_text()
+          if "com.google.gms.google-services" not in src:
+              # Add classpath plugin alongside flutter/android plugins.
+              src = re.sub(
+                  r'(id\s+"com\.android\.application"\s+version\s+"[^"]+"\s+apply\s+false)',
+                  r'\1\n    id "com.google.gms.google-services" version "4.4.2" apply false',
+                  src,
+                  count=1,
+              )
+              settings.write_text(src)
+              print("Patched", settings)
+
+          appgradle = pathlib.Path("android/app/build.gradle")
+          if not appgradle.exists():
+              appgradle = pathlib.Path("android/app/build.gradle.kts")
+          src = appgradle.read_text()
+          if "com.google.gms.google-services" not in src:
+              src = re.sub(
+                  r'(id\s+"dev\.flutter\.flutter-gradle-plugin")',
+                  r'\1\n    id "com.google.gms.google-services"',
+                  src,
+                  count=1,
+              )
+              appgradle.write_text(src)
+              print("Patched", appgradle)
+          print(src[:1500])
           PY
 
       - name: Flutter pub get

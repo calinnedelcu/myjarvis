@@ -188,7 +188,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen>
             onChanged: (v) => setState(() => _playOnPc = v),
             title: const Text('Also speak on PC',
                 style: TextStyle(color: Colors.white)),
-            activeColor: kAccent,
+            activeThumbColor: kAccent,
             dense: true,
           ),
           Padding(
@@ -209,11 +209,11 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen>
                       height: 160,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _phaseColor().withOpacity(0.15),
+                        color: _phaseColor().withValues(alpha: 0.15),
                         border: Border.all(color: _phaseColor(), width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: _phaseColor().withOpacity(0.4),
+                            color: _phaseColor().withValues(alpha: 0.4),
                             blurRadius: 30,
                             spreadRadius: 4,
                           ),

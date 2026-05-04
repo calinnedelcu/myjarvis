@@ -150,7 +150,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
             value: _playOnPc,
             onChanged: (v) => setState(() => _playOnPc = v),
             title: const Text('Speak on PC', style: TextStyle(color: Colors.white)),
-            activeColor: kAccent,
+            activeThumbColor: kAccent,
             dense: true,
           ),
           Container(
@@ -208,7 +208,7 @@ class _TurnBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: const BoxConstraints(maxWidth: 320),
         decoration: BoxDecoration(
-          color: turn.isUser ? kAccentDim.withOpacity(0.3) : kBgPanel,
+          color: turn.isUser ? kAccentDim.withValues(alpha: 0.3) : kBgPanel,
           border: Border.all(color: turn.isUser ? kAccent : kAccentDim),
           borderRadius: BorderRadius.circular(10),
         ),

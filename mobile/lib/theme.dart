@@ -17,7 +17,7 @@ ThemeData jarvisTheme() {
       surface: kBgPanel,
       error: kDanger,
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: kBgPanel,
       elevation: 0,
       shape: RoundedRectangleBorder(

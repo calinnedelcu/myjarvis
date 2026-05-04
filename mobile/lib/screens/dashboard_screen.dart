@@ -154,7 +154,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           children: [
                             if (_error != null)
                               Card(
-                                color: kDanger.withOpacity(0.15),
+                                color: kDanger.withValues(alpha: 0.15),
                                 child: Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Text(_error!,
@@ -282,7 +282,7 @@ class _LiteOnlyOnboarding extends StatelessWidget {
       );
 
   Widget _divider() =>
-      Divider(color: kAccentDim.withOpacity(0.4), height: 12);
+      Divider(color: kAccentDim.withValues(alpha: 0.4), height: 12);
 }
 
 class _LiteBanner extends StatelessWidget {
@@ -292,7 +292,7 @@ class _LiteBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: kAmber.withOpacity(0.15),
+      color: kAmber.withValues(alpha: 0.15),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
