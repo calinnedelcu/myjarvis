@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
@@ -59,6 +61,50 @@ class JarvisApi {
   Future<Map<String, dynamic>> dashboard() async {
     final resp = await _dio.get<Map<String, dynamic>>('/api/mobile/dashboard');
     return resp.data ?? {};
+  }
+
+  /// Upload a WAV file and return Whisper transcript.
+  Future<({String text, String language})> transcribe({
+    required File wavFile,
+    String language = 'en',
+  }) async {
+    final form = FormData.fromMap({
+      'audio': await MultipartFile.fromFile(
+        wavFile.path,
+        filename: 'speech.wav',
+        contentType: DioMediaType('audio', 'wav'),
+      ),
+      'language': language,
+    });
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '/api/mobile/transcribe',
+      data: form,
+      options: Options(
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    );
+    final data = resp.data ?? {};
+    return (
+      text: (data['text'] as String? ?? '').trim(),
+      language: data['language'] as String? ?? language,
+    );
+  }
+
+  /// Render text via PC TTS, return WAV bytes ready for playback.
+  Future<Uint8List> synthesize({
+    required String text,
+    String language = 'en',
+  }) async {
+    final resp = await _dio.post<List<int>>(
+      '/api/mobile/synthesize',
+      data: {'text': text, 'language': language},
+      options: Options(
+        responseType: ResponseType.bytes,
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    );
+    return Uint8List.fromList(resp.data ?? const []);
   }
 
   /// Stream brain reply token-by-token via SSE.

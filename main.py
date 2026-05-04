@@ -116,7 +116,7 @@ def main() -> None:
 
     # Phase 9: Web dashboard
     from ui.dashboard import start_dashboard
-    start_dashboard(config, port=9000, brain=brain, tts=tts)
+    start_dashboard(config, port=9000, brain=brain, tts=tts, stt=stt)
 
     # -- callback: wake word detected — user is now speaking -------------
     def on_wake() -> None:

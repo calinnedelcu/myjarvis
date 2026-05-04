@@ -7,6 +7,7 @@ import '../services/storage.dart';
 import '../theme.dart';
 import 'ask_screen.dart';
 import 'setup_screen.dart';
+import 'voice_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -85,16 +86,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: kAccent,
-        foregroundColor: kBg,
-        icon: const Icon(Icons.chat_bubble_outline),
-        label: const Text('ASK'),
-        onPressed: _api == null
-            ? null
-            : () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => AskScreen(api: _api!)),
-                ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'voice',
+            backgroundColor: kBgPanel,
+            foregroundColor: kAccent,
+            shape: const CircleBorder(side: BorderSide(color: kAccent, width: 2)),
+            onPressed: _api == null
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => VoiceScreen(api: _api!)),
+                    ),
+            child: const Icon(Icons.mic),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'ask',
+            backgroundColor: kAccent,
+            foregroundColor: kBg,
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('ASK'),
+            onPressed: _api == null
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => AskScreen(api: _api!)),
+                    ),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: kAccent,

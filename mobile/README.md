@@ -47,15 +47,50 @@ Companion app: dashboard + remote text control over Tailscale.
 
    On first launch enter `http://100.x.x.x:9000` and the API key. Credentials are stored in the device keychain.
 
-## What works in Phase 1
+## What works
 
+**Phase 1 — text remote**
 - Live dashboard cards (system, weather, calendar, emails, Spotify, lights), 30s refresh + pull-to-refresh
 - "Ask" screen — text in → SSE-streamed brain reply, optional `Speak on PC` toggle
 - EN ↔ RO language switch
 - Tailscale-only connectivity (no port forwarding required)
 
+**Phase 2 — voice on phone**
+- Hold-to-talk mic FAB on the dashboard → `Voice` screen
+- Records 16 kHz mono WAV on the phone
+- Pipeline: `/api/mobile/transcribe` → `/api/mobile/ask` (SSE) → `/api/mobile/synthesize` → playback on phone speaker
+- Optional `Also speak on PC` toggle
+
+### Required permissions
+
+After running `flutter create .`, add these once:
+
+**Android** — `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+```
+
+If your PC server uses plain HTTP (Tailscale magic IP, no TLS), also add to the `<application>` tag:
+
+```xml
+android:usesCleartextTraffic="true"
+```
+
+**iOS** — `ios/Runner/Info.plist`:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>Jarvis needs the microphone to capture voice commands.</string>
+<key>NSAppTransportSecurity</key>
+<dict>
+  <key>NSAllowsArbitraryLoads</key>
+  <true/>
+</dict>
+```
+
 ## Coming next
 
-- Phase 2: hold-to-talk voice (record → /api/mobile/transcribe → /ask → /synthesize → playback)
 - Phase 3: FCM push notifications
 - Phase 4: standalone (lite) mode when PC offline

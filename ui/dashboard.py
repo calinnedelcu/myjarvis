@@ -120,10 +120,11 @@ app.include_router(settings.router)
 app.include_router(mobile.router)
 
 
-def init_dashboard(config: dict, brain_instance=None, tts_instance=None) -> None:
+def init_dashboard(config: dict, brain_instance=None, tts_instance=None,
+                    stt_instance=None) -> None:
     global _config, _rate_limit_info
     _config = config
-    mobile.set_runtime(brain_instance, tts_instance)
+    mobile.set_runtime(brain=brain_instance, tts=tts_instance, stt=stt_instance)
     cors_origins = config.get("mobile", {}).get("cors_origins")
     if cors_origins:
         for mw in app.user_middleware:
@@ -510,10 +511,10 @@ async def claude_terminal(ws: WebSocket):
 
 # ── Server startup ───────────────────────────────────────────────
 
-def start_dashboard(config: dict, port: int = 9000, brain=None, tts=None):
+def start_dashboard(config: dict, port: int = 9000, brain=None, tts=None, stt=None):
     """Start the dashboard server in a background thread."""
     global _main_loop
-    init_dashboard(config, brain_instance=brain, tts_instance=tts)
+    init_dashboard(config, brain_instance=brain, tts_instance=tts, stt_instance=stt)
 
     # Ensure static dir exists
     _STATIC.mkdir(parents=True, exist_ok=True)

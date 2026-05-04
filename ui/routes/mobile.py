@@ -16,8 +16,8 @@ from datetime import datetime
 from typing import Any
 
 import psutil
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -29,13 +29,15 @@ router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 # Shared singletons set by ui.dashboard.init_dashboard()
 _brain = None
 _tts = None
+_stt = None
 
 
-def set_runtime(brain, tts) -> None:
-    """Called from ui.dashboard at startup to wire in the live Brain + TTS."""
-    global _brain, _tts
+def set_runtime(brain=None, tts=None, stt=None) -> None:
+    """Called from ui.dashboard at startup to wire in the live Brain + TTS + STT."""
+    global _brain, _tts, _stt
     _brain = brain
     _tts = tts
+    _stt = stt
 
 
 # ── Health ───────────────────────────────────────────────────────
@@ -185,4 +187,55 @@ async def ask(req: AskRequest):
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+# ── Transcribe (phone mic → text) ────────────────────────────────
+
+@router.post("/transcribe", dependencies=[Depends(require_api_key)])
+async def transcribe(
+    audio: UploadFile = File(...),
+    language: str = Form("en"),
+) -> dict:
+    """Receive a WAV upload from the phone, return Whisper transcript."""
+    if _stt is None:
+        raise HTTPException(503, "STT not initialized.")
+    if language not in ("en", "ro"):
+        language = "en"
+
+    wav_bytes = await audio.read()
+    if not wav_bytes:
+        raise HTTPException(400, "Empty audio upload.")
+
+    loop = asyncio.get_event_loop()
+    text, lang = await loop.run_in_executor(
+        None, _stt.transcribe, wav_bytes, language
+    )
+    return {"text": text, "language": lang}
+
+
+# ── Synthesize (text → audio for phone playback) ─────────────────
+
+class SynthesizeRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+    language: str = Field(default="en", pattern="^(en|ro)$")
+
+
+@router.post("/synthesize", dependencies=[Depends(require_api_key)])
+async def synthesize(req: SynthesizeRequest):
+    """Render text via the configured TTS engine, return WAV bytes."""
+    if _tts is None:
+        raise HTTPException(503, "TTS not initialized.")
+
+    loop = asyncio.get_event_loop()
+    wav = await loop.run_in_executor(
+        None, _tts.synthesize_to_wav, req.text, req.language
+    )
+    if not wav:
+        raise HTTPException(500, "TTS produced no audio.")
+
+    return Response(
+        content=wav,
+        media_type="audio/wav",
+        headers={"Cache-Control": "no-store"},
     )
