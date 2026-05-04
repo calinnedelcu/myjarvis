@@ -188,7 +188,7 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen>
             onChanged: (v) => setState(() => _playOnPc = v),
             title: const Text('Also speak on PC',
                 style: TextStyle(color: Colors.white)),
-            activeThumbColor: kAccent,
+            activeColor: kAccent,
             dense: true,
           ),
           Padding(

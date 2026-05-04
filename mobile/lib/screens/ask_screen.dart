@@ -150,7 +150,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
             value: _playOnPc,
             onChanged: (v) => setState(() => _playOnPc = v),
             title: const Text('Speak on PC', style: TextStyle(color: Colors.white)),
-            activeThumbColor: kAccent,
+            activeColor: kAccent,
             dense: true,
           ),
           Container(
