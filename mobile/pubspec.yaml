@@ -16,10 +16,12 @@ dependencies:
   flutter_riverpod: ^2.5.1
   flutter_markdown: ^0.7.4
   # Phase 2 — voice
-  record: ^5.1.2
-  just_audio: ^0.9.40
+  # record 5.x ships record_android 1.5.1 which is incompatible with the
+  # Flutter Gradle Plugin in 3.24+. 6.x fixes the gradle bindings.
+  record: ^6.0.0
+  just_audio: ^0.9.46
   permission_handler: ^11.3.1
-  path_provider: ^2.1.4
+  path_provider: ^2.1.5
   # Phase 3 — push notifications
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3

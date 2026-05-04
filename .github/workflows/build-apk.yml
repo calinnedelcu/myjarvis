@@ -87,18 +87,6 @@ jobs:
           print(src)
           PY
 
-      - name: Bump Gradle / Android SDK if needed
-        working-directory: mobile
-        run: |
-          # flutter_local_notifications 17.x requires compileSdk >= 34
-          BUILD_GRADLE=android/app/build.gradle
-          if [ -f "$BUILD_GRADLE" ]; then
-            sed -i 's/compileSdkVersion .*/compileSdk 34/' "$BUILD_GRADLE"
-            sed -i 's/targetSdkVersion .*/targetSdkVersion 34/' "$BUILD_GRADLE"
-            sed -i 's/minSdkVersion .*/minSdkVersion 23/' "$BUILD_GRADLE"
-            cat "$BUILD_GRADLE"
-          fi
-
       - name: Flutter pub get
         working-directory: mobile
         run: flutter pub get
