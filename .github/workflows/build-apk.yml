@@ -43,8 +43,7 @@ jobs:
           flutter create . \
             --project-name jarvis_mobile \
             --org com.myjarvis \
-            --platforms=android \
-            --overwrite=false || true
+            --platforms=android
           ls -la android/
 
       - name: Patch AndroidManifest with required permissions
