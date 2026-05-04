@@ -1,23 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/connection_mode.dart';
 import '../services/jarvis_api.dart';
 import '../services/push_service.dart';
 import '../services/storage.dart';
 import '../theme.dart';
 import 'ask_screen.dart';
+import 'settings_screen.dart';
 import 'setup_screen.dart';
 import 'voice_screen.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   JarvisApi? _api;
   Map<String, dynamic>? _data;
   String? _error;
@@ -48,6 +51,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _api = JarvisApi(creds);
     // Register this phone for push notifications (no-op if Firebase missing).
     unawaited(PushService.instance.registerWith(_api!));
+    // Start probing PC reachability for lite-mode auto-detection.
+    ref.read(connectionMonitorProvider.notifier).start(_api!);
     await _refresh();
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
   }
@@ -81,10 +86,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final mode = ref.watch(connectionMonitorProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('J.A.R.V.I.S.'),
         actions: [
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh),
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
@@ -120,31 +133,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: kAccent,
-        onRefresh: _refresh,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator(color: kAccent))
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (_error != null)
-                    Card(
-                      color: kDanger.withOpacity(0.15),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Text(_error!, style: const TextStyle(color: kDanger)),
-                      ),
+      body: Column(
+        children: [
+          if (mode.isStandalone) const _LiteBanner(),
+          Expanded(
+            child: RefreshIndicator(
+              color: kAccent,
+              onRefresh: _refresh,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: kAccent))
+                  : ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        if (_error != null)
+                          Card(
+                            color: kDanger.withOpacity(0.15),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Text(_error!,
+                                  style: const TextStyle(color: kDanger)),
+                            ),
+                          ),
+                        _SystemCard(_data?['system']),
+                        _SimpleCard('WEATHER', _formatWeather(_data?['weather'])),
+                        _SimpleCard('CALENDAR', _data?['calendar']?.toString()),
+                        _SimpleCard('EMAILS', _data?['emails']?.toString()),
+                        _SimpleCard('SPOTIFY', _data?['spotify']?.toString()),
+                        _SimpleCard('LIGHTS', _data?['lights']?.toString()),
+                        const SizedBox(height: 80),
+                      ],
                     ),
-                  _SystemCard(_data?['system']),
-                  _SimpleCard('WEATHER', _formatWeather(_data?['weather'])),
-                  _SimpleCard('CALENDAR', _data?['calendar']?.toString()),
-                  _SimpleCard('EMAILS', _data?['emails']?.toString()),
-                  _SimpleCard('SPOTIFY', _data?['spotify']?.toString()),
-                  _SimpleCard('LIGHTS', _data?['lights']?.toString()),
-                  const SizedBox(height: 80),
-                ],
-              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -153,6 +174,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (w is! Map) return null;
     return '${w['temp_c']}°C — ${w['description']}\n'
         'Feels ${w['feels_like']}°C · humidity ${w['humidity']}%';
+  }
+}
+
+class _LiteBanner extends StatelessWidget {
+  const _LiteBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: kAmber.withOpacity(0.15),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off, color: kAmber, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'PC offline — running in lite mode',
+              style: TextStyle(color: kAmber, letterSpacing: 1.2),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+            style: TextButton.styleFrom(foregroundColor: kAmber),
+            child: const Text('SETTINGS'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

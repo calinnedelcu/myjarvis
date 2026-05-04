@@ -1,22 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/connection_mode.dart';
 import '../services/jarvis_api.dart';
 import '../services/voice_pipeline.dart';
 import '../theme.dart';
 
-class VoiceScreen extends StatefulWidget {
+class VoiceScreen extends ConsumerStatefulWidget {
   const VoiceScreen({super.key, required this.api});
   final JarvisApi api;
 
   @override
-  State<VoiceScreen> createState() => _VoiceScreenState();
+  ConsumerState<VoiceScreen> createState() => _VoiceScreenState();
 }
 
 enum _Phase { idle, recording, transcribing, thinking, speaking }
 
-class _VoiceScreenState extends State<VoiceScreen>
+class _VoiceScreenState extends ConsumerState<VoiceScreen>
     with SingleTickerProviderStateMixin {
   late final VoicePipeline _pipeline = VoicePipeline(widget.api);
   late final AnimationController _pulse = AnimationController(
@@ -47,6 +49,10 @@ class _VoiceScreenState extends State<VoiceScreen>
 
   Future<void> _onTapDown(_) async {
     if (_phase != _Phase.idle) return;
+    if (ref.read(connectionMonitorProvider).isStandalone) {
+      _showError('Voice needs the PC for STT/TTS — use ASK in lite mode.');
+      return;
+    }
     setState(() {
       _transcript = '';
       _reply = '';

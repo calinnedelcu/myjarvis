@@ -140,6 +140,19 @@ curl -X POST -H "Authorization: Bearer YOUR_KEY" \
      http://100.x.x.x:9000/api/mobile/push/test
 ```
 
+**Phase 4 — standalone (lite) mode**
+- Auto-detects when the PC is unreachable (probes `/api/mobile/health` every 20s).
+- Amber `PC offline — running in lite mode` banner appears on the dashboard.
+- Tap **ASK** in lite mode and the phone calls the OpenAI API **directly** with a stripped-down brain. Replies are prefixed `[lite mode]`.
+- Lite tools shipped:
+  - `get_weather` (Open-Meteo, no API key)
+  - `set_reminder` (local notification scheduled via `flutter_local_notifications`)
+  - `calculate` (in-app shunting-yard evaluator)
+- Voice screen disabled in lite mode (STT/TTS still need the PC) — use ASK instead.
+- Add an OpenAI key in **Settings → LITE MODE** before going offline. Stored in the device keychain, kept separate from the PC API key.
+- Override toggle in Settings → `FORCE LITE` for testing, then `AUTO DETECT` to resume probing.
+
 ## Coming next
 
-- Phase 4: standalone (lite) mode when PC offline
+- Replay queue (lite-mode commands offered to PC when it comes back online)
+- Optional on-device LLM (Gemma 2B int4 via `flutter_gemma`) — adds ~1.4 GB so opt-in only

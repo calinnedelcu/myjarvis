@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/connection_mode.dart';
 import '../services/jarvis_api.dart';
+import '../services/push_service.dart';
+import '../services/storage.dart';
+import '../standalone/lite_brain.dart';
 import '../theme.dart';
 
-class AskScreen extends StatefulWidget {
+class AskScreen extends ConsumerStatefulWidget {
   const AskScreen({super.key, required this.api});
   final JarvisApi api;
 
   @override
-  State<AskScreen> createState() => _AskScreenState();
+  ConsumerState<AskScreen> createState() => _AskScreenState();
 }
 
-class _AskScreenState extends State<AskScreen> {
+class _AskScreenState extends ConsumerState<AskScreen> {
+  LiteBrain? _liteBrain;
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final List<_Turn> _turns = [];
@@ -26,7 +32,18 @@ class _AskScreenState extends State<AskScreen> {
     super.dispose();
   }
 
-  void _send() {
+  Future<LiteBrain?> _ensureLiteBrain() async {
+    if (_liteBrain != null) return _liteBrain;
+    final key = await CredentialStore.instance.readLiteOpenAiKey();
+    if (key == null || key.isEmpty) return null;
+    _liteBrain = LiteBrain(
+      openaiKey: key,
+      notifications: PushService.instance.notifications,
+    );
+    return _liteBrain;
+  }
+
+  void _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _streaming) return;
     _input.clear();
@@ -37,9 +54,27 @@ class _AskScreenState extends State<AskScreen> {
       _streaming = true;
     });
 
-    widget.api
-        .ask(text: text, language: _language, playOnPc: _playOnPc)
-        .listen(
+    final mode = ref.read(connectionMonitorProvider);
+    final Stream<AskEvent> stream;
+    if (mode.isStandalone) {
+      final brain = await _ensureLiteBrain();
+      if (brain == null) {
+        setState(() {
+          reply.text +=
+              'Lite mode needs an OpenAI key. Open Settings to add one.';
+          _streaming = false;
+        });
+        return;
+      }
+      reply.text = '[lite mode] ';
+      stream = brain.ask(text: text, language: _language);
+    } else {
+      stream = widget.api.ask(
+        text: text, language: _language, playOnPc: _playOnPc,
+      );
+    }
+
+    stream.listen(
       (event) {
         switch (event.type) {
           case AskEventType.chunk:

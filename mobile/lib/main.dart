@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'screens/dashboard_screen.dart';
 import 'screens/setup_screen.dart';
@@ -8,10 +9,13 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize FCM up front; safe no-op if Firebase isn't configured yet.
+  // Initialize FCM + local notifications + timezone up front.
+  // Safe no-op if Firebase isn't configured yet (lite-mode reminders still work).
   await PushService.instance.initialize();
   final creds = await CredentialStore.instance.read();
-  runApp(JarvisApp(hasCredentials: creds != null));
+  runApp(
+    ProviderScope(child: JarvisApp(hasCredentials: creds != null)),
+  );
 }
 
 class JarvisApp extends StatelessWidget {
