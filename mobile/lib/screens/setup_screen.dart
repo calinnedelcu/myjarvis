@@ -120,10 +120,48 @@ class _SetupScreenState extends State<SetupScreen> {
                       )
                     : const Text('CONNECT'),
               ),
+              const SizedBox(height: 24),
+              const Divider(color: kAccentDim),
+              const SizedBox(height: 12),
+              const Text(
+                'No PC nearby?',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Skip and use lite mode only — answers questions, weather, '
+                'and reminders directly from your phone via OpenAI. You can '
+                'connect to your PC later from Settings.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _busy ? null : _skipToLite,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kAmber,
+                  side: const BorderSide(color: kAmber),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                ),
+                child: const Text('SKIP — EXPLORE IN LITE MODE'),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _skipToLite() async {
+    // Save sentinel credentials so the dashboard bootstraps in standalone mode
+    // and the user can flip to "real" PC setup later from Settings.
+    await CredentialStore.instance.save(JarvisCredentials(
+      baseUrl: 'http://lite-mode.local',
+      apiKey: 'lite-mode-placeholder-key',
+    ));
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const DashboardScreen()),
     );
   }
 }

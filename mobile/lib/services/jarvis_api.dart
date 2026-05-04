@@ -42,8 +42,15 @@ class JarvisApi {
   final JarvisCredentials _creds;
   final Dio _dio;
 
+  /// True when these credentials are the "skip setup" placeholder, meaning
+  /// the user explicitly opted into lite-only mode. Skip every PC call.
+  bool get isLiteOnly =>
+      _creds.baseUrl == 'http://lite-mode.local' ||
+      _creds.apiKey == 'lite-mode-placeholder-key';
+
   /// Pings /api/mobile/health. Returns true on 200.
   Future<bool> health() async {
+    if (isLiteOnly) return false;
     try {
       final resp = await _dio.get(
         '/api/mobile/health',

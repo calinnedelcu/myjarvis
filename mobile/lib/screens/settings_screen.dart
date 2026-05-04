@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/connection_mode.dart';
 import '../services/storage.dart';
 import '../theme.dart';
+import 'setup_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -115,6 +116,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   : 'FORCE LITE'),
                             ),
                           ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'PC CONNECTION',
+                  style: TextStyle(color: kAccent, letterSpacing: 2),
+                ),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Connect to your PC for the full experience: '
+                          'real dashboard cards, voice in/out via the desktop '
+                          'mic and speakers, and 47 tools.',
+                          style: TextStyle(color: Colors.white70, height: 1.4),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () async {
+                            await CredentialStore.instance.clear();
+                            if (!context.mounted) return;
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                  builder: (_) => const SetupScreen()),
+                              (_) => false,
+                            );
+                          },
+                          child: const Text('SET UP PC NOW'),
                         ),
                       ],
                     ),

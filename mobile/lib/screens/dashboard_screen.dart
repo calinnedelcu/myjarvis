@@ -53,6 +53,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     unawaited(PushService.instance.registerWith(_api!));
     // Start probing PC reachability for lite-mode auto-detection.
     ref.read(connectionMonitorProvider.notifier).start(_api!);
+    if (_api!.isLiteOnly) {
+      // No PC paired — skip dashboard refresh, just settle UI.
+      setState(() => _loading = false);
+      return;
+    }
     await _refresh();
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
   }
@@ -142,27 +147,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               onRefresh: _refresh,
               child: _loading
                   ? const Center(child: CircularProgressIndicator(color: kAccent))
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        if (_error != null)
-                          Card(
-                            color: kDanger.withOpacity(0.15),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Text(_error!,
-                                  style: const TextStyle(color: kDanger)),
-                            ),
-                          ),
-                        _SystemCard(_data?['system']),
-                        _SimpleCard('WEATHER', _formatWeather(_data?['weather'])),
-                        _SimpleCard('CALENDAR', _data?['calendar']?.toString()),
-                        _SimpleCard('EMAILS', _data?['emails']?.toString()),
-                        _SimpleCard('SPOTIFY', _data?['spotify']?.toString()),
-                        _SimpleCard('LIGHTS', _data?['lights']?.toString()),
-                        const SizedBox(height: 80),
-                      ],
-                    ),
+                  : (_api?.isLiteOnly == true)
+                      ? const _LiteOnlyOnboarding()
+                      : ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            if (_error != null)
+                              Card(
+                                color: kDanger.withOpacity(0.15),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Text(_error!,
+                                      style: const TextStyle(color: kDanger)),
+                                ),
+                              ),
+                            _SystemCard(_data?['system']),
+                            _SimpleCard(
+                                'WEATHER', _formatWeather(_data?['weather'])),
+                            _SimpleCard(
+                                'CALENDAR', _data?['calendar']?.toString()),
+                            _SimpleCard(
+                                'EMAILS', _data?['emails']?.toString()),
+                            _SimpleCard(
+                                'SPOTIFY', _data?['spotify']?.toString()),
+                            _SimpleCard(
+                                'LIGHTS', _data?['lights']?.toString()),
+                            const SizedBox(height: 80),
+                          ],
+                        ),
             ),
           ),
         ],
@@ -175,6 +187,102 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return '${w['temp_c']}°C — ${w['description']}\n'
         'Feels ${w['feels_like']}°C · humidity ${w['humidity']}%';
   }
+}
+
+class _LiteOnlyOnboarding extends StatelessWidget {
+  const _LiteOnlyOnboarding();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const SizedBox(height: 12),
+        const Icon(Icons.smart_toy_outlined, size: 96, color: kAccent),
+        const SizedBox(height: 16),
+        const Text(
+          'JARVIS LITE',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: kAccent, letterSpacing: 4, fontSize: 22, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 24),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _step(1, 'Add an OpenAI API key',
+                    'Open Settings → LITE MODE → paste a key (sk-…). '
+                    'Stored only on this phone, never sent to the PC.'),
+                _divider(),
+                _step(2, 'Tap ASK',
+                    'Type any question. Lite Jarvis answers directly via OpenAI.'),
+                _divider(),
+                _step(3, 'Try the lite tools',
+                    '• "What\'s the weather in Bucharest?"\n'
+                    '• "Set a reminder to drink water in 15 minutes."\n'
+                    '• "Calculate 2389 * 14 / 5."'),
+                _divider(),
+                _step(4, 'When you\'re home',
+                    'Settings → PC CONNECTION → SET UP PC NOW to pair with '
+                    'the desktop and unlock voice + 47 tools.'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Tap ASK in the bottom-right to start.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white54),
+        ),
+        const SizedBox(height: 80),
+      ],
+    );
+  }
+
+  Widget _step(int n, String title, String body) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28, height: 28,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: kAccent, shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$n',
+                style: const TextStyle(
+                    color: kBg, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2)),
+                  const SizedBox(height: 4),
+                  Text(body,
+                      style: const TextStyle(
+                          color: Colors.white70, height: 1.4)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _divider() =>
+      Divider(color: kAccentDim.withOpacity(0.4), height: 12);
 }
 
 class _LiteBanner extends StatelessWidget {
