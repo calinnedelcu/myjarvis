@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/jarvis_api.dart';
+import '../services/push_service.dart';
 import '../services/storage.dart';
 import '../theme.dart';
 import 'ask_screen.dart';
@@ -45,6 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
     _api = JarvisApi(creds);
+    // Register this phone for push notifications (no-op if Firebase missing).
+    unawaited(PushService.instance.registerWith(_api!));
     await _refresh();
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
   }

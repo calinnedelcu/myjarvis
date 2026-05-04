@@ -426,6 +426,18 @@ def _run_claude_streaming(prompt: str, image_data: str = None):
         _session_stats["context_messages"] = len(_claude_history)
         broadcast_to_clients({"type": "session_stats", "stats": _session_stats})
         broadcast_to_clients({"type": "claude_done", "content": full_output})
+        # Phase 3 — also push to registered phones so the user gets pinged
+        # even when the dashboard isn't open.
+        try:
+            from core import notifications
+            preview = (full_output[:80] + "…") if len(full_output) > 80 else full_output
+            notifications.push_async(
+                "🤖 Claude Code finished",
+                preview or "Task complete.",
+                data={"kind": "claude_done"},
+            )
+        except Exception:
+            logger.debug("claude_done push notification failed", exc_info=True)
 
         if not completed:
             broadcast_to_clients({"type": "claude_error", "content": "Response timed out."})
@@ -515,6 +527,13 @@ def start_dashboard(config: dict, port: int = 9000, brain=None, tts=None, stt=No
     """Start the dashboard server in a background thread."""
     global _main_loop
     init_dashboard(config, brain_instance=brain, tts_instance=tts, stt_instance=stt)
+
+    # Phase 3 — proactive push notification pollers (no-op if FCM not configured)
+    try:
+        from core import proactive
+        proactive.start(config)
+    except Exception as exc:
+        logger.warning(f"Proactive notifications failed to start: {exc}")
 
     # Ensure static dir exists
     _STATIC.mkdir(parents=True, exist_ok=True)

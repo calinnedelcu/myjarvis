@@ -20,6 +20,10 @@ dependencies:
   just_audio: ^0.9.40
   permission_handler: ^11.3.1
   path_provider: ^2.1.4
+  # Phase 3 — push notifications
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.2.3
 
 dev_dependencies:
   flutter_lints: ^4.0.0

@@ -239,3 +239,53 @@ async def synthesize(req: SynthesizeRequest):
         media_type="audio/wav",
         headers={"Cache-Control": "no-store"},
     )
+
+
+# ── Device registration (FCM push tokens) ────────────────────────
+
+class DeviceRegister(BaseModel):
+    token: str = Field(..., min_length=10, max_length=512)
+    platform: str = Field(default="", max_length=16)
+    label: str = Field(default="", max_length=64)
+
+
+@router.post("/devices/register", dependencies=[Depends(require_api_key)])
+async def register_device(req: DeviceRegister) -> dict:
+    from ui.db_managers import device_db
+    device_db.register(req.token, platform=req.platform, label=req.label)
+    return {"ok": True, "registered": req.token[:12] + "…"}
+
+
+@router.delete("/devices/{token}", dependencies=[Depends(require_api_key)])
+async def unregister_device(token: str) -> dict:
+    from ui.db_managers import device_db
+    device_db.unregister(token)
+    return {"ok": True}
+
+
+@router.get("/devices", dependencies=[Depends(require_api_key)])
+async def list_devices() -> dict:
+    from ui.db_managers import device_db
+    devices = device_db.list_active()
+    # Hide raw token, only return prefix for verification
+    return {
+        "count": len(devices),
+        "devices": [
+            {**d, "token": d["token"][:12] + "…"}
+            for d in devices
+        ],
+    }
+
+
+class PushTest(BaseModel):
+    title: str = Field(default="Jarvis")
+    body: str = Field(default="Test notification from PC.")
+
+
+@router.post("/push/test", dependencies=[Depends(require_api_key)])
+async def push_test(req: PushTest) -> dict:
+    from core import notifications
+    if not notifications.is_configured():
+        raise HTTPException(503, "FCM not configured (apis.fcm.*).")
+    sent = notifications.push(req.title, req.body, data={"source": "test"})
+    return {"sent": sent}

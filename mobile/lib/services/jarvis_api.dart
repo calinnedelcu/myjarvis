@@ -63,6 +63,22 @@ class JarvisApi {
     return resp.data ?? {};
   }
 
+  /// Register an FCM token so the PC can push notifications to this device.
+  Future<void> registerDevice({
+    required String token,
+    String platform = '',
+    String label = '',
+  }) async {
+    await _dio.post(
+      '/api/mobile/devices/register',
+      data: {'token': token, 'platform': platform, 'label': label},
+    );
+  }
+
+  Future<void> unregisterDevice(String token) async {
+    await _dio.delete('/api/mobile/devices/$token');
+  }
+
   /// Upload a WAV file and return Whisper transcript.
   Future<({String text, String language})> transcribe({
     required File wavFile,

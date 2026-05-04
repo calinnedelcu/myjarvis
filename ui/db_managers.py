@@ -141,6 +141,64 @@ class VoiceLogManager:
             rows = conn.execute("SELECT timestamp, direction, text FROM voice_interactions WHERE timestamp LIKE ? ORDER BY timestamp DESC LIMIT 50", (f"{date_str}%",)).fetchall()
             return [{"timestamp": r[0], "direction": r[1], "text": r[2]} for r in rows]
 
+class MobileDeviceManager:
+    """Phase 3 — registry of phone FCM tokens for push notifications."""
+
+    def __init__(self):
+        self._db_path = _DATA_DIR / "mobile_devices.db"
+        self._lock = threading.Lock()
+        self._init_db()
+
+    def _conn(self):
+        return sqlite3.connect(self._db_path, check_same_thread=False)
+
+    def _init_db(self):
+        with self._lock:
+            with self._conn() as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS devices (
+                        token TEXT PRIMARY KEY,
+                        platform TEXT,
+                        label TEXT,
+                        registered_at TEXT NOT NULL,
+                        last_seen_at TEXT NOT NULL
+                    )
+                """)
+                conn.commit()
+
+    def register(self, token: str, platform: str = "", label: str = "") -> None:
+        now = datetime.now().isoformat()
+        with self._lock:
+            with self._conn() as conn:
+                conn.execute("""
+                    INSERT INTO devices (token, platform, label, registered_at, last_seen_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(token) DO UPDATE SET
+                        platform = excluded.platform,
+                        label = excluded.label,
+                        last_seen_at = excluded.last_seen_at
+                """, (token, platform, label, now, now))
+                conn.commit()
+
+    def unregister(self, token: str) -> None:
+        with self._lock:
+            with self._conn() as conn:
+                conn.execute("DELETE FROM devices WHERE token = ?", (token,))
+                conn.commit()
+
+    def list_active(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT token, platform, label, registered_at, last_seen_at FROM devices"
+            ).fetchall()
+        return [
+            {"token": r[0], "platform": r[1], "label": r[2],
+             "registered_at": r[3], "last_seen_at": r[4]}
+            for r in rows
+        ]
+
+
 # Global DB singletons
 brain_db = BrainDBManager()
 voice_db = VoiceLogManager()
+device_db = MobileDeviceManager()

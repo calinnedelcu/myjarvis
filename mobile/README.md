@@ -90,7 +90,56 @@ android:usesCleartextTraffic="true"
 </dict>
 ```
 
+**Phase 3 — push notifications (FCM)**
+- New unread emails (60s poll)
+- Upcoming calendar events (10 min lead)
+- Claude Code task finished
+- Foreground display via `flutter_local_notifications`; background uses the system tray.
+
+### Firebase setup (one-time)
+
+1. Create a project: <https://console.firebase.google.com> → "Add project".
+2. **Android app** — package name `com.myjarvis.jarvis_mobile` (or whatever the `--org` flag in `flutter create` set). Download `google-services.json` and place it at `mobile/android/app/google-services.json`.
+3. **iOS app** — bundle ID matching your Xcode project. Download `GoogleService-Info.plist` and drag it into `Runner` in Xcode (target Runner, copy if needed). Set up an APNs auth key in `Project settings → Cloud Messaging → Apple app configuration`.
+4. **Backend service account** — `Project settings → Service accounts → Generate new private key`. Save the JSON to the PC at `data/fcm-service-account.json`.
+5. In `config.yaml` on the PC, fill:
+
+   ```yaml
+   apis:
+     fcm:
+       service_account_path: "data/fcm-service-account.json"
+       project_id: "your-firebase-project-id"
+   ```
+
+   (project_id is at the top of the Firebase console General tab.)
+
+6. **Android Gradle wiring** — after `flutter create .`, add to `android/build.gradle`:
+
+   ```gradle
+   buildscript {
+     dependencies {
+       classpath 'com.google.gms:google-services:4.4.2'
+     }
+   }
+   ```
+
+   And to `android/app/build.gradle` at the bottom:
+
+   ```gradle
+   apply plugin: 'com.google.gms.google-services'
+   ```
+
+7. Restart `python main.py` (logs should say "Proactive pollers started"), then launch the app. After login the device auto-registers.
+
+### Test push
+
+```bash
+curl -X POST -H "Authorization: Bearer YOUR_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"title":"Jarvis","body":"hello sir"}' \
+     http://100.x.x.x:9000/api/mobile/push/test
+```
+
 ## Coming next
 
-- Phase 3: FCM push notifications
 - Phase 4: standalone (lite) mode when PC offline
