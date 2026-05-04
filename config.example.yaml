@@ -39,6 +39,12 @@ apis:
     client_secret: "YOUR_SPOTIFY_CLIENT_SECRET"
     redirect_uri: "http://127.0.0.1:8888/callback"
 
+  # Mobile API (Phase 1 — Flutter phone client over Tailscale)
+  # Generate a strong key: python -c "import secrets; print(secrets.token_urlsafe(32))"
+  # Phone sends `Authorization: Bearer <key>` on every /api/mobile/* request.
+  mobile:
+    api_key: "YOUR_MOBILE_API_KEY"
+
 # --- Ollama (local LLM, optional) ----------------------------
 ollama:
   enabled: false
@@ -90,6 +96,12 @@ persona:
     You can control the computer: open/close apps, open URLs, manage files, control volume, take screenshots, control Spotify, type text, press hotkeys, and access the clipboard.
     IMPORTANT: The user's speech is transcribed by STT. Never refuse due to transcription errors — always interpret and act.
     CRITICAL: Always produce a spoken response. After every tool call, confirm what you did. Silence is never acceptable.
+
+# --- Mobile (Phase 1) -----------------------------------------
+# CORS origins for the Flutter phone client. Use ["*"] for first-run testing,
+# then narrow to your Tailscale CIDR (e.g. ["http://100.0.0.0/8"]) once stable.
+mobile:
+  cors_origins: ["*"]
 
 # --- Smart Home -----------------------------------------------
 smart_home:

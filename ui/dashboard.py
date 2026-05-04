@@ -25,6 +25,7 @@ def _strip_ansi(text: str) -> str:
 
 import psutil
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
@@ -94,11 +95,21 @@ _session_stats: dict = {  # accumulated session usage stats
     "fast_mode": "off",
 }
 
-from ui.routes import brain, briefing, projects, ide, settings
+from ui.routes import brain, briefing, projects, ide, settings, mobile
 from ui.db_managers import voice_db
 
 app = FastAPI(title="J.A.R.V.I.S. Dashboard")
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+
+# CORS — phone client connects from Tailscale IP / app webview / local dev.
+# Origins narrowed via config.mobile.cors_origins; default "*" for first run.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include the modular routers
 app.include_router(brain.router)
@@ -106,11 +117,19 @@ app.include_router(briefing.router)
 app.include_router(projects.router)
 app.include_router(ide.router)
 app.include_router(settings.router)
+app.include_router(mobile.router)
 
 
-def init_dashboard(config: dict) -> None:
+def init_dashboard(config: dict, brain_instance=None, tts_instance=None) -> None:
     global _config, _rate_limit_info
     _config = config
+    mobile.set_runtime(brain_instance, tts_instance)
+    cors_origins = config.get("mobile", {}).get("cors_origins")
+    if cors_origins:
+        for mw in app.user_middleware:
+            if mw.cls is CORSMiddleware:
+                mw.kwargs["allow_origins"] = cors_origins
+                break
     # Fetch plan usage utilization at startup so the home page island has data immediately
     def _initial_fetch():
         global _rate_limit_info
@@ -491,10 +510,10 @@ async def claude_terminal(ws: WebSocket):
 
 # ── Server startup ───────────────────────────────────────────────
 
-def start_dashboard(config: dict, port: int = 9000):
+def start_dashboard(config: dict, port: int = 9000, brain=None, tts=None):
     """Start the dashboard server in a background thread."""
     global _main_loop
-    init_dashboard(config)
+    init_dashboard(config, brain_instance=brain, tts_instance=tts)
 
     # Ensure static dir exists
     _STATIC.mkdir(parents=True, exist_ok=True)
