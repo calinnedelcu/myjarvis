@@ -115,6 +115,14 @@ jobs:
               count=1,
           )
 
+          # 1b. Bump minSdk to 23 (record_android, just_audio, firebase_*).
+          src = re.sub(
+              r'minSdk\s*=?\s*flutter\.minSdkVersion',
+              'minSdk = 23' if is_kts else 'minSdk 23',
+              src,
+              count=1,
+          )
+
           # 2. Enable core library desugaring inside compileOptions.
           if "isCoreLibraryDesugaringEnabled" not in src and "coreLibraryDesugaringEnabled" not in src:
               if is_kts:
