@@ -1112,6 +1112,18 @@ tr:hover { background: rgba(255,255,255,0.02); }
     .data-island { transform: scale(0.8); }
 }
 
+/* ── Portrait / vertical monitor ── */
+@media (orientation: portrait) {
+    #page-home {
+        /* Narrower canvas, taller vertical spread */
+        left: -30vw;
+        width: 160vw;
+        top: -50vh;
+        height: 200vh;
+    }
+    .arc-reactor-container { width: 320px; height: 320px; }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    NEURAL NETWORK NAVIGATION
    ═══════════════════════════════════════════════════════════════ */
@@ -1647,4 +1659,109 @@ tr:hover { background: rgba(255,255,255,0.02); }
     line-height: 1.4;
     color: var(--text-main);
     word-break: break-word;
+}
+
+/* ── Agentic state strip (top-right of page-home) ──────────────────── */
+.agent-strip {
+    position: absolute;
+    top: 12px;
+    right: 24px;
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+    pointer-events: none;
+}
+.agent-chip {
+    pointer-events: auto;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    background: rgba(5, 13, 26, 0.7);
+    border: 1px solid rgba(0, 200, 232, 0.4);
+    color: var(--accent-cyan);
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+}
+.agent-chip:hover { background: rgba(0, 200, 232, 0.12); }
+.agent-chip.plan-pending {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    box-shadow: 0 0 12px rgba(255, 167, 38, 0.4);
+    animation: agent-pulse 1.6s ease-in-out infinite;
+}
+.agent-chip.at-pc     { border-color: var(--accent-cyan);   color: var(--accent-cyan); }
+.agent-chip.on-phone  { border-color: var(--accent-amber);  color: var(--accent-amber); }
+.agent-chip.away      { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); }
+.agent-chip.quiet     { border-color: var(--accent-purple); color: var(--accent-purple); }
+@keyframes agent-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(255, 167, 38, 0.3); }
+    50%      { box-shadow: 0 0 22px rgba(255, 167, 38, 0.7); }
+}
+
+/* ── Agent panels on briefing page ─────────────────────────────────── */
+.agent-task-row, .agent-watch-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: rgba(0, 200, 232, 0.04);
+    border-left: 3px solid var(--accent-cyan);
+}
+.agent-task-row .status-dot, .agent-watch-row .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+}
+.agent-task-row .row-label, .agent-watch-row .row-label {
+    flex: 1;
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.agent-task-row .row-meta, .agent-watch-row .row-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+.agent-task-row.status-running, .agent-watch-row.status-active {
+    border-left-color: var(--accent-amber);
+}
+.agent-task-row.status-running .status-dot { background: var(--accent-amber); }
+.agent-task-row.status-pending  .status-dot { background: rgba(255,255,255,0.5); }
+.agent-task-row.status-done     .status-dot { background: var(--accent-cyan); }
+.agent-task-row.status-failed   .status-dot { background: var(--accent-red); }
+.agent-task-row.status-cancelled .status-dot { background: rgba(255,255,255,0.3); }
+.agent-watch-row.status-active { border-left-color: var(--accent-cyan); }
+.agent-watch-row.status-fired  {
+    border-left-color: var(--accent-amber);
+    background: rgba(255, 167, 38, 0.08);
+}
+.agent-watch-row.status-fired .status-dot { background: var(--accent-amber); }
+.agent-watch-row.status-active .status-dot { background: var(--accent-cyan); }
+
+.agent-routine-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 16px;
+    background: rgba(179, 136, 255, 0.10);
+    border: 1px solid rgba(179, 136, 255, 0.4);
+    color: var(--accent-purple);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+}
+.agent-routine-pill:hover {
+    background: rgba(179, 136, 255, 0.22);
+    box-shadow: 0 0 12px rgba(179, 136, 255, 0.4);
+}
+.agent-routine-pill .routine-trigger {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.7rem;
 }

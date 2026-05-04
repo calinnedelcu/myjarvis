@@ -31,7 +31,8 @@ from core.wake_word import WakeWordDetector
 from core.stt import SpeechToText
 from core.tts import TextToSpeech
 from core.brain import Brain
-from core import language
+from core import (context, continue_session, language, plans, presence,
+                  router, routines, scheduler, jobs)
 from tools import register_all
 from ui.hud import JarvisHUD, STANDBY, LISTENING, THINKING, SPEAKING, PAUSED
 
@@ -117,6 +118,17 @@ def main() -> None:
     # Phase 9: Web dashboard
     from ui.dashboard import start_dashboard
     start_dashboard(config, port=9000, brain=brain, tts=tts, stt=stt)
+
+    # ── Context + presence + router + scheduler + routines ──────────
+    context.init()                     # active window + clipboard pollers
+    presence.init(config)
+    router.wire(hud=hud, tts=tts)
+    routines.set_brain(brain)
+    routines.load()
+    plans.set_brain(brain)             # propose/confirm plans use brain handlers
+    scheduler.init()
+    jobs.register_all(config)
+    scheduler.get().start()
 
     # -- callback: wake word detected — user is now speaking -------------
     def on_wake() -> None:
@@ -233,6 +245,14 @@ def main() -> None:
     def _start_pipeline():
         detector.start()
         tts.greet(language=language.get())
+        # Brief carry-over from yesterday — only if there's something to say
+        try:
+            brief = continue_session.compose_brief()
+            if brief:
+                logger.info(f"continue-brief: {brief[:120]}")
+                tts.speak(brief, language=language.get())
+        except Exception as exc:
+            logger.debug(f"continue-brief skipped: {exc}")
         logger.info("Jarvis is online — say 'Hey Jarvis' to begin.")
 
     threading.Thread(target=_start_pipeline, daemon=True).start()

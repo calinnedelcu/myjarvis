@@ -236,7 +236,158 @@ async def dashboard_data():
     except Exception:
         data["lights"] = "Could not check lights."
 
+    # ── Live Jarvis state (presence / tasks / watches / plans / routines) ──
+    try:
+        from core import presence as _presence
+        p = _presence.get()
+        if p is not None:
+            snap = p.snapshot()
+            data["presence"] = {
+                "state": snap.state,
+                "quiet_hours": snap.quiet_hours,
+                "pc_idle_seconds": int(snap.pc_idle_seconds),
+            }
+    except Exception:
+        pass
+
+    try:
+        from core import tasks as _tasks
+        recent = _tasks.list_recent(limit=10)
+        data["tasks"] = {
+            "running_count": len([t for t in recent
+                                  if t["status"] in ("running", "pending")]),
+            "recent": [
+                {"id": t["id"], "kind": t["kind"], "status": t["status"],
+                 "prompt": t["prompt"][:120], "updated_at": t["updated_at"],
+                 "result_preview": (t.get("result") or "")[:200]}
+                for t in recent[:6]
+            ],
+        }
+    except Exception:
+        pass
+
+    try:
+        from core import watches as _watches
+        all_w = _watches.list_all(include_archived=False)
+        data["watches"] = [
+            {"id": w["id"], "label": w["label"], "url": w["url"][:80],
+             "status": w["status"], "condition": w["condition"][:60],
+             "interval_minutes": w["interval_seconds"] // 60,
+             "hits": w["hits"], "last_message": w["last_message"]}
+            for w in all_w[:8]
+        ]
+    except Exception:
+        pass
+
+    try:
+        from core import plans as _plans
+        pending = _plans.most_recent_pending()
+        if pending:
+            data["pending_plan"] = {
+                "id": pending["id"],
+                "summary": pending["summary"],
+                "step_count": len(pending["steps"]),
+                "step_summaries": [
+                    s.get("summary") or s.get("tool")
+                    for s in pending["steps"]
+                ][:6],
+            }
+    except Exception:
+        pass
+
+    try:
+        from core import routines as _routines
+        data["routines"] = [
+            {
+                "name": r.name,
+                "description": r.description,
+                "voice_phrases": [
+                    p for t in r.triggers if t.type == "voice" for p in t.phrases
+                ][:3],
+                "schedule": [
+                    {"time": t.time, "days": t.days}
+                    for t in r.triggers if t.type == "schedule"
+                ],
+                "step_count": len(r.steps),
+            }
+            for r in _routines.list_all()
+        ]
+    except Exception:
+        pass
+
+    try:
+        from core import context as _context
+        data["active_brief"] = _context.active_brief()
+    except Exception:
+        pass
+
+    try:
+        from core import scheduler as _scheduler
+        s = _scheduler.get()
+        if s is not None:
+            jobs = s.list_jobs()
+            data["scheduler"] = [
+                {"name": j["name"], "kind": j["kind"],
+                 "next_fire_in": j["next_fire_in"]}
+                for j in jobs
+            ]
+    except Exception:
+        pass
+
     return data
+
+
+# ── Direct routes for routine/task/watch operations from web UI ──
+
+@app.post("/api/routines/run")
+async def web_run_routine(payload: dict):
+    from core import routines as _routines
+    name = str(payload.get("name", ""))
+    if not name:
+        return {"ok": False, "error": "missing name"}
+    _routines.run_async(name)
+    return {"ok": True, "name": name}
+
+
+@app.post("/api/routines/reload")
+async def web_reload_routines():
+    from core import routines as _routines
+    n = _routines.load()
+    return {"ok": True, "loaded": n}
+
+
+@app.post("/api/plan/confirm")
+async def web_confirm_plan():
+    from tools.plan_tool import confirm_last_plan
+    return {"result": confirm_last_plan()}
+
+
+@app.post("/api/plan/cancel")
+async def web_cancel_plan():
+    from tools.plan_tool import cancel_last_plan
+    return {"result": cancel_last_plan()}
+
+
+@app.post("/api/watch/stop")
+async def web_stop_watch(payload: dict):
+    from core import watches as _watches
+    wid = int(payload.get("id", 0))
+    return {"ok": _watches.stop(wid)}
+
+
+@app.post("/api/watch/reactivate")
+async def web_reactivate_watch(payload: dict):
+    from core import watches as _watches
+    wid = int(payload.get("id", 0))
+    return {"ok": _watches.reactivate(wid)}
+
+
+@app.post("/api/task/cancel")
+async def web_cancel_task(payload: dict):
+    from core import tasks as _tasks
+    tid = int(payload.get("id", 0))
+    _tasks.cancel(tid)
+    return {"ok": True}
 
 
 @app.get("/api/system")
@@ -528,12 +679,8 @@ def start_dashboard(config: dict, port: int = 9000, brain=None, tts=None, stt=No
     global _main_loop
     init_dashboard(config, brain_instance=brain, tts_instance=tts, stt_instance=stt)
 
-    # Phase 3 — proactive push notification pollers (no-op if FCM not configured)
-    try:
-        from core import proactive
-        proactive.start(config)
-    except Exception as exc:
-        logger.warning(f"Proactive notifications failed to start: {exc}")
+    # Proactive checks are now driven by core.scheduler (initialised in main.py)
+    # — no per-poller threads here.
 
     # Ensure static dir exists
     _STATIC.mkdir(parents=True, exist_ok=True)

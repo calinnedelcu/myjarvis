@@ -11,8 +11,11 @@ from typing import Any, Generator
 
 from loguru import logger
 
+from core import conversation, routines
+
 _TOOL_TIMEOUT = 60  # seconds before a tool call is abandoned
 _MAX_TOOL_ROUNDS = 5
+_HISTORY_LIMIT = 40  # how many recent turns to include in each prompt
 
 
 # ── Think-block filter (strips <think>...</think> reasoning from local models) ──
@@ -78,7 +81,6 @@ class Brain:
         self._openai_client = None
 
         self._persona: str = config.get("persona", {}).get("system_prompt", "You are Jarvis.")
-        self._history: list[dict] = []
         self._tools: list[dict[str, Any]] = []   # Anthropic format (canonical, converted on the fly)
         self._tool_handlers: dict[str, Any] = {}
         self._memory = None
@@ -163,14 +165,36 @@ class Brain:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def think_stream(self, text: str, language: str = "en") -> Generator[str, None, None]:
-        """Stream response.  Priority: ollama (if enabled) → OpenAI."""
+    def think_stream(self, text: str, language: str = "en",
+                     source: str = "voice") -> Generator[str, None, None]:
+        """Stream response.  Priority: ollama (if enabled) → OpenAI.
+
+        `source` tags this turn's origin (voice / mobile / dashboard / scheduler)
+        in the cross-device conversation store.
+        """
         if not text.strip():
             return
 
-        self._history.append({"role": "user", "content": text})
-        if len(self._history) > 40:
-            self._history[:] = self._history[-40:]
+        # ── Routine fast-path ──────────────────────────────────────
+        # If the spoken text matches a voice-trigger routine, run it instead
+        # of calling the LLM. The brain still streams a single acknowledgement
+        # line so the existing TTS pipeline speaks something cohesive; the
+        # rest of the routine fires asynchronously through core.router.
+        if source == "voice":
+            matched = routines.match_voice(text)
+            if matched is not None:
+                ack = (routines.first_speak_text(matched)
+                       or f"Running {matched.name}.")
+                logger.info(f"Brain → routine fast-path: {matched.name}")
+                conversation.append("user", text, source=source, lang=language)
+                yield ack
+                conversation.append("assistant", ack,
+                                    source=source, lang=language)
+                routines.run_async(matched.name, skip_first_speak=True)
+                return
+
+        conversation.append("user", text, source=source, lang=language)
+        history = conversation.history_for_brain(_HISTORY_LIMIT)
 
         system = self._build_system(language, user_text=text)
         full_reply = ""
@@ -179,27 +203,27 @@ class Brain:
             if self._ollama_enabled:
                 backend_name = "ollama"
                 try:
-                    for chunk in self._stream_ollama(system):
+                    for chunk in self._stream_ollama(system, history):
                         full_reply += chunk
                         yield chunk
                 except Exception as exc:
                     if full_reply:
                         logger.error(f"Ollama failed mid-stream: {exc}")
-                        self._history.append({"role": "assistant",
-                                              "content": full_reply})
+                        conversation.append("assistant", full_reply,
+                                            source=source, lang=language)
                         return
                     logger.warning(f"Ollama failed, falling back to OpenAI: {exc}")
                     backend_name = "openai"
-                    for chunk in self._stream_openai(system):
+                    for chunk in self._stream_openai(system, history):
                         full_reply += chunk
                         yield chunk
             else:
                 backend_name = "openai"
-                for chunk in self._stream_openai(system):
+                for chunk in self._stream_openai(system, history):
                     full_reply += chunk
                     yield chunk
 
-            self._history.append({"role": "assistant", "content": full_reply})
+            conversation.append("assistant", full_reply, source=source, lang=language)
             logger.info(
                 f"Brain [{backend_name}]: "
                 f"{full_reply[:120]}{'…' if len(full_reply) > 120 else ''}"
@@ -209,18 +233,19 @@ class Brain:
             logger.error(f"Brain stream error: {exc}")
             fallback = ("Scuze, am avut o eroare." if language == "ro"
                         else "Sorry sir, I hit a snag.")
-            self._history.append({"role": "assistant", "content": fallback})
+            conversation.append("assistant", fallback, source=source, lang=language)
             yield fallback
 
     # ------------------------------------------------------------------
     # OpenAI streaming (GPT-4.1 mini — primary)
     # ------------------------------------------------------------------
-    def _stream_openai(self, system: str) -> Generator[str, None, None]:
+    def _stream_openai(self, system: str,
+                       history: list[dict]) -> Generator[str, None, None]:
         import time as _time
         client = self._get_openai()
 
         messages: list[dict] = [{"role": "system", "content": system}]
-        for msg in self._history:
+        for msg in history:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
         tools = self._tools_openai() if self._tools else None
@@ -327,11 +352,12 @@ class Brain:
     # ------------------------------------------------------------------
     # Ollama streaming (local, optional — OpenAI-compatible API)
     # ------------------------------------------------------------------
-    def _stream_ollama(self, system: str) -> Generator[str, None, None]:
+    def _stream_ollama(self, system: str,
+                       history: list[dict]) -> Generator[str, None, None]:
         client = self._get_ollama()
 
         messages: list[dict] = [{"role": "system", "content": system}]
-        for msg in self._history:
+        for msg in history:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
         tools = self._tools_openai() if self._tools else None
@@ -467,6 +493,19 @@ class Brain:
                 "\n- After calling a tool, confirm what you did in 1 sentence."
             )
 
+        # Inject live PC context (active app/window/clipboard) so the brain
+        # can resolve "this", "that file", "the tab" without asking.
+        try:
+            from core import context as _ctx
+            brief = _ctx.active_brief()
+            if brief:
+                base += (f"\n\nLive PC context (right now): {brief}"
+                         "\nUse this to resolve 'this', 'that file', 'the tab' "
+                         "etc. — call get_active_context, read_active_tab, "
+                         "or clipboard_history for details.")
+        except Exception:
+            pass
+
         # Inject relevant long-term memories when available
         if self._memory and user_text:
             memory_context = self._memory.get_context_for(user_text)
@@ -489,5 +528,5 @@ class Brain:
         return base
 
     def clear_history(self) -> None:
-        self._history.clear()
-        logger.info("Conversation history cleared")
+        n = conversation.clear()
+        logger.info(f"Conversation history cleared ({n} turns)")

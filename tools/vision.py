@@ -52,13 +52,28 @@ def _capture_b64(monitor: int = 0, region: dict | None = None) -> tuple[str, tup
     return b64, pil.size
 
 
-def _ask_vision(img_b64: str, prompt: str) -> str:
+def analyze_image_bytes(image_bytes: bytes, prompt: str,
+                        max_tokens: int = 1024) -> str:
+    """Public helper — accept raw image bytes (PNG/JPG), resize, ask vision."""
+    from PIL import Image
+    pil = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    if pil.width > _MAX_WIDTH:
+        ratio = _MAX_WIDTH / pil.width
+        pil = pil.resize((int(pil.width * ratio), int(pil.height * ratio)),
+                         Image.LANCZOS)
+    buf = io.BytesIO()
+    pil.save(buf, format="PNG", optimize=True)
+    b64 = base64.standard_b64encode(buf.getvalue()).decode()
+    return _ask_vision(b64, prompt, max_tokens=max_tokens)
+
+
+def _ask_vision(img_b64: str, prompt: str, max_tokens: int = 1024) -> str:
     """Send an image to GPT-4.1 mini vision and return the text response."""
     from openai import OpenAI
     client = OpenAI(api_key=_api_key)
     response = client.chat.completions.create(
         model=_model,
-        max_tokens=1024,
+        max_tokens=max_tokens,
         messages=[{
             "role": "user",
             "content": [

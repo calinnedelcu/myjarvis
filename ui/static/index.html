@@ -40,6 +40,15 @@
                 <div class="hud-particles" id="hud-particles"></div>
                 <div class="hud-scanline"></div>
 
+                <!-- Live agentic-state strip (top-right, always visible) -->
+                <div id="agent-strip" class="agent-strip">
+                    <span id="agent-strip-presence" class="agent-chip">—</span>
+                    <span id="agent-strip-tasks" class="agent-chip" style="display:none;">⚙ 0</span>
+                    <span id="agent-strip-watches" class="agent-chip" style="display:none;">👁 0</span>
+                    <span id="agent-strip-plan" class="agent-chip plan-pending" style="display:none;">⚠ PLAN</span>
+                    <span id="agent-strip-meeting" class="agent-chip" style="display:none;">🎤 MTG</span>
+                </div>
+
                 <!-- Center Arc Reactor — Breathing Brain Core -->
                 <div class="arc-reactor-container">
                     <!-- Ambient glow aura behind reactor -->
@@ -394,6 +403,41 @@
                     <h3>SUGGESTED ACTIONS</h3>
                     <div id="briefing-suggestions-list" class="action-grid"></div>
                 </div>
+
+                <!-- ── Live Jarvis state — agentic panels ─────────────── -->
+
+                <div id="agent-pending-plan-card" class="card" style="margin-top:1rem; display:none; border-color:#FFB800; box-shadow: 0 0 24px rgba(255,184,0,0.18);">
+                    <h3 style="color:#FFB800">⚠ PENDING PLAN</h3>
+                    <div id="agent-plan-summary" style="font-weight:600; margin-top:6px;"></div>
+                    <ol id="agent-plan-steps" style="margin-top:8px; padding-left: 1.2rem; opacity:0.85;"></ol>
+                    <div style="margin-top:12px; display:flex; gap:8px;">
+                        <button class="action-btn" id="btn-plan-confirm">CONFIRM</button>
+                        <button class="action-btn border-orange" id="btn-plan-cancel">CANCEL</button>
+                    </div>
+                </div>
+
+                <div class="card border-cyan" style="margin-top:1rem">
+                    <h3>ACTIVE TASKS</h3>
+                    <div id="agent-tasks-list"></div>
+                </div>
+
+                <div class="card border-orange" style="margin-top:1rem">
+                    <h3>WATCHES</h3>
+                    <div id="agent-watches-list"></div>
+                </div>
+
+                <div class="card border-purple" style="margin-top:1rem">
+                    <h3>ROUTINES</h3>
+                    <div id="agent-routines-list" class="action-grid"></div>
+                    <div style="margin-top:8px; opacity:0.6; font-size:0.8rem; letter-spacing:1px;">
+                        Click a routine to run it now. Edit data/routines.yaml for new ones.
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top:1rem; opacity:0.85">
+                    <h3 style="opacity:0.7">SCHEDULED JOBS</h3>
+                    <div id="agent-scheduler-list" style="font-family: 'Share Tech Mono', monospace; font-size:0.8rem; line-height:1.6;"></div>
+                </div>
             </section>
 
             <!-- PROJECTS PAGE -->
@@ -586,5 +630,6 @@
     <script src="/static/js/pages/ide.js"></script>
     <script src="/static/js/pages/settings.js"></script>
     <script src="/static/js/pages/voice-log.js"></script>
+    <script src="/static/js/pages/agent.js"></script>
 </body>
 </html>

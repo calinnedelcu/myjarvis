@@ -132,6 +132,9 @@
     let _dragMoved = false;
     let _dragStartX = 0, _dragStartY = 0;
 
+    // Portrait detection
+    const _isPortrait = window.innerHeight > window.innerWidth * 1.15;
+
     // Initial positions (% of viewport) — wide horizontal spread
     const ISLAND_INIT = {
         'island-weather':   { x: -25, y: 18 },
@@ -143,13 +146,25 @@
         'island-claude':    { x: -15, y: 68 },
     };
 
+    // Portrait: tighter horizontal, spread vertically around the core
+    const ISLAND_INIT_PORTRAIT = {
+        'island-weather':   { x: 15,  y: -18 },
+        'island-calendar':  { x: 85,  y: -12 },
+        'island-email':     { x: 105, y: 30 },
+        'island-spotify':   { x: -5,  y: 30 },
+        'island-lights':    { x: 105, y: 70 },
+        'island-telemetry': { x: -5,  y: 75 },
+        'island-claude':    { x: 50,  y: 108 },
+    };
+
     function initIslands() {
         const home = document.getElementById('page-home');
         if (!home) return;
 
         document.querySelectorAll('.data-island').forEach(el => {
             const id = el.id;
-            const init = ISLAND_INIT[id] || { x: 50, y: 50 };
+            const initMap = _isPortrait ? ISLAND_INIT_PORTRAIT : ISLAND_INIT;
+            const init = initMap[id] || { x: 50, y: 50 };
             const vw = home.clientWidth, vh = home.clientHeight;
             // Map % to viewport area (centered within the larger canvas)
             const viewL = (vw - window.innerWidth) / 2;
@@ -426,6 +441,15 @@
         boundaryK:    0.08,    // boundary spring constant
     };
 
+    // Portrait overrides — tighter orbit, smaller exclusion zone
+    if (_isPortrait) {
+        PHYSICS.centerRadius = 240;
+        PHYSICS.springRest   = 240;
+        PHYSICS.minDist      = 190;
+        PHYSICS.repulsion    = 5000;
+        PHYSICS.boundaryPad  = 80;
+    }
+
     function applyPhysics(cx, cy) {
         const home = document.getElementById('page-home');
         if (!home) return;
@@ -502,29 +526,51 @@
             n.fy += (n.homeY - n.y) * PHYSICS.homeK * 8;
         });
 
-        // Boundary forces — tight vertically, very loose horizontally
+        // Boundary forces — orientation-aware
         const pad = PHYSICS.boundaryPad, bk = PHYSICS.boundaryK;
         const viewL = (vw - window.innerWidth) / 2;
         const viewT = (vh - window.innerHeight) / 2;
+        const viewR = viewL + window.innerWidth;
         const viewB = viewT + window.innerHeight;
         const vPad = 50;
-        allNodes.forEach(n => {
-            // Horizontal: only stop at canvas edges (very far out)
-            if (n.x < pad)       n.fx += (pad - n.x) * bk * 0.3;
-            if (n.x > vw - pad)  n.fx -= (n.x - (vw - pad)) * bk * 0.3;
-            // Vertical: locked tight to viewport
-            if (n.y < viewT + vPad)  n.fy += (viewT + vPad - n.y) * bk * 4;
-            if (n.y > viewB - vPad)  n.fy -= (n.y - (viewB - vPad)) * bk * 4;
-        });
 
-        // Horizontal spread — only islands, not nav nodes
-        const centerX = vw / 2;
-        islands.forEach(n => {
-            const dx = n.x - centerX;
-            const absDx = Math.abs(dx);
-            const spreadForce = Math.max(0, window.innerWidth - absDx) * 0.001;
-            n.fx += Math.sign(dx || 1) * spreadForce;
-        });
+        if (_isPortrait) {
+            // Portrait: tight horizontal (keep in viewport), loose vertical (canvas edges)
+            allNodes.forEach(n => {
+                if (n.x < viewL + vPad)  n.fx += (viewL + vPad - n.x) * bk * 3;
+                if (n.x > viewR - vPad)  n.fx -= (n.x - (viewR - vPad)) * bk * 3;
+                if (n.y < pad)       n.fy += (pad - n.y) * bk * 0.3;
+                if (n.y > vh - pad)  n.fy -= (n.y - (vh - pad)) * bk * 0.3;
+            });
+        } else {
+            // Landscape: loose horizontal (canvas edges), tight vertical (viewport)
+            allNodes.forEach(n => {
+                if (n.x < pad)       n.fx += (pad - n.x) * bk * 0.3;
+                if (n.x > vw - pad)  n.fx -= (n.x - (vw - pad)) * bk * 0.3;
+                if (n.y < viewT + vPad)  n.fy += (viewT + vPad - n.y) * bk * 4;
+                if (n.y > viewB - vPad)  n.fy -= (n.y - (viewB - vPad)) * bk * 4;
+            });
+        }
+
+        if (_isPortrait) {
+            // Vertical spread — push islands away from center Y
+            const centerY = vh / 2;
+            islands.forEach(n => {
+                const dy = n.y - centerY;
+                const absDy = Math.abs(dy);
+                const spreadForce = Math.max(0, window.innerHeight - absDy) * 0.0008;
+                n.fy += Math.sign(dy || 1) * spreadForce;
+            });
+        } else {
+            // Horizontal spread — push islands away from center X
+            const centerX = vw / 2;
+            islands.forEach(n => {
+                const dx = n.x - centerX;
+                const absDx = Math.abs(dx);
+                const spreadForce = Math.max(0, window.innerWidth - absDx) * 0.001;
+                n.fx += Math.sign(dx || 1) * spreadForce;
+            });
+        }
 
         // Integrate velocity and update positions
         allNodes.forEach(n => {

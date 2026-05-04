@@ -89,8 +89,14 @@ def _get_access_token() -> str | None:
 
 
 def push(title: str, body: str, *, data: dict | None = None,
-         tokens: Iterable[str] | None = None) -> int:
-    """Send a notification to one or many device tokens. Returns number sent."""
+         tokens: Iterable[str] | None = None,
+         actions: list[dict] | None = None) -> int:
+    """Send a notification to one or many device tokens. Returns number sent.
+
+    `actions` is an optional list of {id, label} dicts. They'll be embedded
+    in the data payload as a JSON-encoded string under the key 'actions',
+    which the Flutter side decodes and renders as Android action buttons.
+    """
     global _warned_no_config
 
     if not is_configured():
@@ -120,6 +126,16 @@ def push(title: str, body: str, *, data: dict | None = None,
         "Content-Type": "application/json; charset=UTF-8",
     }
 
+    payload_data = {k: str(v) for k, v in (data or {}).items()}
+    if actions:
+        # FCM data values must be strings — encode the action list as JSON
+        clean_actions = [
+            {"id": str(a.get("id", "")), "label": str(a.get("label", ""))}
+            for a in actions if a.get("id") and a.get("label")
+        ]
+        if clean_actions:
+            payload_data["actions"] = json.dumps(clean_actions)
+
     sent = 0
     invalid: list[str] = []
     for token in tokens:
@@ -127,7 +143,7 @@ def push(title: str, body: str, *, data: dict | None = None,
             "message": {
                 "token": token,
                 "notification": {"title": title, "body": body},
-                "data": {k: str(v) for k, v in (data or {}).items()},
+                "data": payload_data,
                 "android": {"priority": "high"},
                 "apns": {"headers": {"apns-priority": "10"}},
             }

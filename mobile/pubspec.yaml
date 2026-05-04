@@ -30,6 +30,12 @@ dependencies:
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
   flutter_timezone: ^3.0.1
+  # Phase 10 — camera/vision: capture or pick an image, send to GPT-4 Vision
+  image_picker: ^1.1.2
+  # Phase 11 — geofence zones (foreground polling MVP)
+  geolocator: ^13.0.1
+  # Phase 12 — persistent status notification (Android foreground service)
+  flutter_foreground_task: ^8.10.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0
